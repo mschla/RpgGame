@@ -122,7 +122,7 @@ def setup_lights(scene, cam):
 
 
 # ---------------------------------------------------------------- materials
-def material(name, color, roughness=0.8, noise=None, wave=None):
+def material(name, color, roughness=0.8, noise=None, wave=None, bump=None):
     """Principled material; `noise` = (scale, dark_color) mixes a noise pattern, `wave` = (scale, dark_color)
     adds horizontal bands (logs, planks)."""
     m = bpy.data.materials.new(name)
@@ -156,6 +156,17 @@ def material(name, color, roughness=0.8, noise=None, wave=None):
         links.new(mix.outputs[2], bsdf.inputs['Base Color'])
     else:
         bsdf.inputs['Base Color'].default_value = color
+    if bump:
+        coord2 = nodes.new('ShaderNodeTexCoord')
+        btex = nodes.new('ShaderNodeTexNoise')
+        btex.inputs['Scale'].default_value = bump[0]
+        btex.inputs['Detail'].default_value = 6
+        btex.inputs['Roughness'].default_value = 0.7
+        bnode = nodes.new('ShaderNodeBump')
+        bnode.inputs['Strength'].default_value = bump[1]
+        links.new(coord2.outputs['Object'], btex.inputs['Vector'])
+        links.new(btex.outputs['Fac'], bnode.inputs['Height'])
+        links.new(bnode.outputs['Normal'], bsdf.inputs['Normal'])
     return m
 
 
@@ -266,47 +277,72 @@ def pivot(name, loc, parent):
 
 
 def build_wolf():
-    """A low-poly grey wolf facing -Y, about one tile long. Returns (root, pose) where pose(anim, t)
+    """A grey wolf facing -Y, a little over one tile long. Returns (root, pose) where pose(anim, t)
     sets the procedural animation for normalized time t in [0, 1]."""
-    fur = material('fur', (0.27, 0.25, 0.22), noise=(9, (0.12, 0.11, 0.10)))
-    belly = material('belly', (0.52, 0.48, 0.42), noise=(9, (0.34, 0.31, 0.28)))
-    dark = material('dark', (0.03, 0.03, 0.03), roughness=0.4)
+    fur = material('fur', (0.16, 0.145, 0.13), noise=(14, (0.06, 0.055, 0.05)), bump=(60, 0.35))
+    fur_light = material('fur_light', (0.36, 0.33, 0.29), noise=(14, (0.20, 0.18, 0.16)), bump=(60, 0.3))
+    fur_dark = material('fur_dark', (0.07, 0.065, 0.06), noise=(14, (0.03, 0.03, 0.03)), bump=(60, 0.35))
+    dark = material('dark', (0.02, 0.02, 0.02), roughness=0.35)
+    eye = material('eye', (0.85, 0.65, 0.12), roughness=0.3)
     root = pivot('Wolf', (0, 0, 0), None)
     body = pivot('pose', (0, 0, 0), root)
-    sphere((0, 0.05, 0.50), (0.16, 0.50, 0.19), fur, 'torso', body)
-    sphere((0, -0.32, 0.53), (0.18, 0.24, 0.22), fur, 'chest', body)
-    sphere((0, 0.38, 0.50), (0.15, 0.20, 0.18), fur, 'hips', body)
-    sphere((0, 0.02, 0.41), (0.12, 0.42, 0.12), belly, 'belly', body)
-    neck = pivot('neck', (0, -0.50, 0.62), body)
-    sphere((0, -0.03, 0.0), (0.11, 0.16, 0.12), fur, 'neck_mesh', neck)
-    head = pivot('head', (0, -0.17, 0.08), neck)
-    sphere((0, 0, 0), (0.14, 0.16, 0.13), fur, 'skull', head)
-    sphere((0, -0.19, -0.04), (0.075, 0.15, 0.065), fur, 'snout', head)
-    sphere((0, -0.33, -0.03), (0.035, 0.035, 0.03), dark, 'nose', head)
+    # torso masses
+    sphere((0, 0.03, 0.47), (0.18, 0.50, 0.20), fur, 'torso', body)
+    sphere((0, -0.28, 0.49), (0.21, 0.25, 0.235), fur, 'chest', body)
+    sphere((0, 0.37, 0.48), (0.175, 0.21, 0.20), fur, 'hips', body)
+    sphere((0, 0.02, 0.62), (0.10, 0.48, 0.07), fur_dark, 'saddle', body)
+    sphere((0, 0.0, 0.37), (0.135, 0.42, 0.12), fur_light, 'belly', body)
     for sx in (-1, 1):
-        sphere((sx * 0.055, -0.09, 0.05), (0.025, 0.02, 0.02), dark, f'eye{sx}', head)
-        bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=0.05, radius2=0, depth=0.16, location=(sx * 0.085, 0.02, 0.15))
+        sphere((sx * 0.125, -0.30, 0.42), (0.095, 0.11, 0.11), fur, f'shoulder{sx}', body)
+        sphere((sx * 0.115, 0.36, 0.41), (0.10, 0.135, 0.125), fur, f'haunch{sx}', body)
+    # neck, ruff and head
+    neck = pivot('neck', (0, -0.47, 0.57), body)
+    sphere((0, -0.03, -0.01), (0.16, 0.18, 0.16), fur, 'ruff', neck)
+    sphere((0, -0.10, 0.04), (0.11, 0.15, 0.11), fur, 'neck_mesh', neck)
+    head = pivot('head', (0, -0.21, 0.09), neck)
+    sphere((0, 0, 0), (0.125, 0.145, 0.115), fur, 'skull', head)
+    sphere((0, -0.03, 0.06), (0.09, 0.11, 0.06), fur_dark, 'brow', head)
+    sphere((0, -0.17, -0.025), (0.068, 0.15, 0.058), fur_light, 'muzzle', head)
+    sphere((0, -0.12, 0.0), (0.075, 0.10, 0.06), fur, 'muzzle_top', head)
+    sphere((0, -0.305, -0.015), (0.03, 0.03, 0.026), dark, 'nose', head)
+    jaw = pivot('jaw', (0, -0.09, -0.06), head)
+    sphere((0, -0.11, -0.005), (0.05, 0.13, 0.03), fur_light, 'jaw_mesh', jaw)
+    for sx in (-1, 1):
+        sphere((sx * 0.06, -0.10, 0.045), (0.024, 0.02, 0.02), eye, f'eye{sx}', head)
+        sphere((sx * 0.066, -0.118, 0.047), (0.011, 0.01, 0.011), dark, f'pupil{sx}', head)
+        bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=0.05, radius2=0.008, depth=0.15, location=(sx * 0.085, 0.03, 0.135))
         ear = bpy.context.active_object
         ear.name = f'ear{sx}'
-        ear.rotation_euler = (math.radians(-15), math.radians(sx * 20), 0)
+        ear.rotation_euler = (math.radians(-18), math.radians(sx * 22), 0)
         ear.data.materials.append(fur)
         ear.parent = head
-    legs = {}
-    for name, (x, y) in {'fl': (-0.11, -0.32), 'fr': (0.11, -0.32), 'bl': (-0.11, 0.34), 'br': (0.11, 0.34)}.items():
-        p = pivot('leg_' + name, (x, y, 0.44), body)
-        bpy.ops.mesh.primitive_cylinder_add(vertices=10, radius=0.05, depth=0.44, location=(0, 0, -0.22))
-        leg = bpy.context.active_object
-        leg.name = 'legmesh_' + name
-        leg.data.materials.append(fur)
-        leg.parent = p
-        sphere((0, -0.02, -0.44), (0.055, 0.075, 0.035), dark, 'paw_' + name, p)
-        legs[name] = p
-    tail = pivot('tail', (0, 0.54, 0.54), body)
-    bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.05, depth=0.36, location=(0, 0.13, -0.11), rotation=(math.radians(-50), 0, 0))
+    # jointed legs
+    legs, knees = {}, {}
+    for name, (x, y) in {'fl': (-0.12, -0.30), 'fr': (0.12, -0.30), 'bl': (-0.11, 0.36), 'br': (0.11, 0.36)}.items():
+        hip = pivot('leg_' + name, (x, y, 0.42), body)
+        bpy.ops.mesh.primitive_cylinder_add(vertices=10, radius=0.055, depth=0.23, location=(0, 0, -0.11))
+        upper = bpy.context.active_object
+        upper.name = 'upper_' + name
+        upper.data.materials.append(fur)
+        upper.parent = hip
+        knee = pivot('knee_' + name, (0, 0, -0.22), hip)
+        bpy.ops.mesh.primitive_cylinder_add(vertices=10, radius=0.038, depth=0.22, location=(0, 0, -0.10))
+        lower = bpy.context.active_object
+        lower.name = 'lower_' + name
+        lower.data.materials.append(fur)
+        lower.parent = knee
+        sphere((0, -0.025, -0.205), (0.055, 0.08, 0.035), fur_dark, 'paw_' + name, knee)
+        legs[name], knees[name] = hip, knee
+    tail = pivot('tail', (0, 0.53, 0.50), body)
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=16, ring_count=10, radius=1, location=(0, 0.15, -0.10))
     t = bpy.context.active_object
     t.name = 'tail_mesh'
+    t.scale = (0.055, 0.21, 0.065)
+    t.rotation_euler = (math.radians(-35), 0, 0)
     t.data.materials.append(fur)
     t.parent = tail
+    bpy.ops.object.shade_smooth()
+    sphere((0, 0.31, -0.22), (0.045, 0.06, 0.045), fur_dark, 'tail_tip', tail)
     bpy.context.view_layer.update()
 
     def pose(anim, t):
@@ -315,44 +351,53 @@ def build_wolf():
         body.rotation_euler = (0, 0, 0)
         neck.rotation_euler = (0, 0, 0)
         head.rotation_euler = (0, 0, 0)
+        jaw.rotation_euler = (0, 0, 0)
         tail.rotation_euler = (0, 0, 0)
-        for p in legs.values():
+        for p in list(legs.values()) + list(knees.values()):
             p.rotation_euler = (0, 0, 0)
         if anim == 'stance':
             body.location = (0, 0, 0.012 * math.sin(w))
-            head.rotation_euler = (math.radians(4 * math.sin(w)), 0, 0)
-            tail.rotation_euler = (0, 0, math.radians(12 * math.sin(w)))
+            head.rotation_euler = (math.radians(4 * math.sin(w)), 0, math.radians(6 * math.sin(w / 2)))
+            tail.rotation_euler = (0, 0, math.radians(14 * math.sin(w)))
         elif anim == 'run':
-            swing = math.radians(38)
-            legs['fl'].rotation_euler.x = swing * math.sin(w)
-            legs['br'].rotation_euler.x = swing * math.sin(w)
-            legs['fr'].rotation_euler.x = -swing * math.sin(w)
-            legs['bl'].rotation_euler.x = -swing * math.sin(w)
+            swing = math.radians(40)
+            for name, phase in (('fl', 0), ('br', 0), ('fr', math.pi), ('bl', math.pi)):
+                sw = math.sin(w + phase)
+                legs[name].rotation_euler.x = swing * sw
+                # knee bends when the leg swings forward
+                knees[name].rotation_euler.x = math.radians(-35 * max(0.0, math.sin(w + phase + math.pi / 2)))
             body.location = (0, 0, 0.035 * abs(math.sin(w)))
             body.rotation_euler.x = math.radians(4 * math.sin(w))
-            neck.rotation_euler.x = math.radians(-8)
-            tail.rotation_euler.x = math.radians(15)
+            neck.rotation_euler.x = math.radians(-10)
+            tail.rotation_euler.x = math.radians(18)
         elif anim == 'swing':
-            k = math.sin(math.pi * t)           # lunge out and back
+            k = math.sin(math.pi * t)
             body.location = (0, -0.18 * k, 0.04 * k)
             body.rotation_euler.x = math.radians(-8 * k)
             neck.rotation_euler.x = math.radians(18 * k)
-            head.rotation_euler.x = math.radians(25 * k)
-            legs['fl'].rotation_euler.x = math.radians(-40 * k)
-            legs['fr'].rotation_euler.x = math.radians(-40 * k)
+            head.rotation_euler.x = math.radians(22 * k)
+            jaw.rotation_euler.x = math.radians(32 * k)
+            legs['fl'].rotation_euler.x = math.radians(-45 * k)
+            legs['fr'].rotation_euler.x = math.radians(-45 * k)
+            knees['fl'].rotation_euler.x = math.radians(-20 * k)
+            knees['fr'].rotation_euler.x = math.radians(-20 * k)
         elif anim == 'hit':
             k = math.sin(math.pi * t)
             body.location = (0, 0.08 * k, 0)
             body.rotation_euler.x = math.radians(10 * k)
             head.rotation_euler.x = math.radians(-20 * k)
+            jaw.rotation_euler.x = math.radians(15 * k)
         elif anim == 'die':
             k = min(1, t * 1.25)
             e = 1 - (1 - k) ** 2
             body.rotation_euler = (math.radians(-6 * e), math.radians(88 * e), 0)
-            body.location = (0.05 * e, 0, -0.36 * e)
+            body.location = (0.05 * e, 0, -0.31 * e)
             neck.rotation_euler.x = math.radians(20 * e)
+            jaw.rotation_euler.x = math.radians(18 * e)
             for p in legs.values():
                 p.rotation_euler.x = math.radians(25 * e)
+            for p in knees.values():
+                p.rotation_euler.x = math.radians(-20 * e)
     return root, pose
 
 
