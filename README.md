@@ -55,7 +55,9 @@ Five areas: Bramblewick, the Rusty Tankard tavern, its cellar, the Whispering Wo
 
 Tiles, props and animated creature sprites are taken from Flare's fantasycore assets (CC-BY-SA 3.0, credits in `assets/CREDITS-flare.txt`, license in `assets/LICENSE-flare-art.txt`). They were rendered at half of Flare's 192x96 resolution, so the game grid is 96x48. Human characters, enemies and NPCs alike, are drawn from Flare's layered avatar sheets, so the hero's armor, weapon and shield show on the sprite. If the `assets/` folder is missing the game falls back to simple procedural graphics.
 
-To regenerate the assets from a flare-game checkout (needs Node and the `playwright` package, whose bundled Chromium does the image scaling):
+Spell, item, ability and class icons are from [game-icons.net](https://game-icons.net) (CC BY 3.0, attribution in `assets/CREDITS-game-icons.txt`). The assignments live in `js/data/icons.js`; `node tools/build-icons.mjs /path/to/game-icons` extracts the SVGs from a checkout of the game-icons/icons repository.
+
+To regenerate the Flare assets from a flare-game checkout (needs Node and the `playwright` package, whose bundled Chromium does the image scaling):
 
 ```
 node tools/build-assets.mjs /path/to/flare-game
@@ -77,6 +79,7 @@ js/game/renderer.js   isometric canvas renderer, tile atlas, sprite animation, f
 js/game/assets.js     art loader, direction and animation helpers
 js/game/avatar.js     equipment to avatar sprite layer mapping
 tools/build-assets.mjs builds assets/ from a flare-game checkout
+tools/build-icons.mjs  extracts the game-icons.net SVGs listed in js/data/icons.js
 js/game/ui.js         HUD, quickbar, panels, dialogue, shop, loot, level-up, character creation
 ```
 

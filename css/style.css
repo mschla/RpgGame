@@ -49,6 +49,17 @@ canvas#game { position: fixed; inset: 0; display: block; cursor: crosshair; }
 .desc ul { padding-left: 18px; margin: 4px 0; }
 .create-actions { display: flex; justify-content: space-between; margin-top: 14px; }
 
+/* game-icons.net icons, recolored through a mask */
+.gi { display: inline-block; width: 1.15em; height: 1.15em; vertical-align: -0.2em; margin-right: 0.35em; background: currentColor; -webkit-mask-size: contain; mask-size: contain; -webkit-mask-position: center; mask-position: center; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
+.gi.big { width: 34px; height: 34px; margin: 0; color: #fff; filter: drop-shadow(0 1px 2px #000); }
+.portrait.small .gi.big { width: 24px; height: 24px; }
+.gi.qb-icon { width: 26px; height: 26px; margin: 0 0 2px; color: var(--gold); }
+.qb.spell .qb-icon { color: #9ec2ff; } .qb.ability .qb-icon { color: #ff9a6a; } .qb.potion .qb-icon { color: #8ee08e; }
+.qb-name { font-size: 9.5px; }
+.card .gi { color: var(--gold-dim); } .card.selected .gi { color: var(--gold); }
+.sname .gi { color: #9ec2ff; }
+.tname .gi { color: var(--gold); }
+
 /* HUD */
 #hud { position: fixed; top: 10px; left: 10px; display: flex; flex-direction: column; gap: 6px; z-index: 5; pointer-events: none; }
 .hud-card { display: flex; gap: 8px; background: var(--panel); border: 1px solid var(--panel-border); padding: 6px; border-radius: 4px; width: 260px; pointer-events: auto; }
@@ -85,10 +96,10 @@ canvas#game { position: fixed; inset: 0; display: block; cursor: crosshair; }
 /* Bottom bar */
 #bottombar { position: fixed; left: 0; right: 0; bottom: 0; background: linear-gradient(rgba(10,9,7,0.5), rgba(10,9,7,0.96)); border-top: 1px solid var(--panel-border); padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; gap: 12px; z-index: 6; }
 #quickbar { display: flex; gap: 4px; flex-wrap: wrap; max-width: 62vw; }
-.qb { position: relative; width: 60px; height: 60px; border: 1px solid var(--panel-border); background: #17130f; border-radius: 4px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; text-align: center; padding: 2px; line-height: 1.15; user-select: none; }
+.qb { position: relative; width: 66px; height: 72px; border: 1px solid var(--panel-border); background: #17130f; border-radius: 4px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; font-size: 10px; text-align: center; padding: 14px 2px 2px; line-height: 1.1; user-select: none; overflow: hidden; }
 .qb:hover { border-color: var(--gold); }
 .qb .key { position: absolute; top: 1px; left: 3px; font-size: 9px; color: var(--muted); }
-.qb .count { position: absolute; bottom: 1px; right: 3px; font-size: 10px; color: var(--gold); font-weight: bold; }
+.qb .count { position: absolute; top: 1px; right: 3px; font-size: 10px; color: var(--gold); font-weight: bold; }
 .qb .icon { font-size: 18px; margin-bottom: 1px; }
 .qb.empty { opacity: 0.4; }
 .qb.spell { border-color: #3a5a8a; } .qb.ability { border-color: #8a3a3a; } .qb.potion { border-color: #3a7a3a; }

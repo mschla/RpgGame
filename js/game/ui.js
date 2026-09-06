@@ -5,14 +5,20 @@ import { ITEMS, EQUIP_SLOTS, SLOT_NAMES } from '../data/items.js';
 import { SPELLS } from '../data/spells.js';
 import { QUESTS } from '../data/quests.js';
 import { mod, fmtMod, diceAverage } from '../core/dice.js';
+import { ICONS, iconFile } from '../data/icons.js';
 import * as E from './entity.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; };
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-const CLASS_ICON = { fighter: '⚔', barbarian: '🪓', rogue: '🗡', ranger: '🏹', cleric: '✚', wizard: '✦' };
-const SPELL_ICON = { damage: '✹', heal: '✚', buff: '◈', debuff: '☠' };
+/** HTML for a game-icons.net icon; `key` is a spell/item/class id, `fallback` an item type. */
+export function icon(key, fallback, cls = '') {
+  const path = ICONS[key] || (fallback && ICONS['type_' + fallback]);
+  if (!path) return '';
+  const u = `url(assets/icons/${iconFile(path)})`;
+  return `<span class="gi ${cls}" style="-webkit-mask-image:${u};mask-image:${u}"></span>`;
+}
 
 export class UI {
   constructor() {
@@ -74,7 +80,7 @@ export class UI {
     const f = p.level >= MAX_LEVEL ? 1 : (p.xp - cur) / (next - cur);
     $('hud-xp').style.width = `${Math.min(100, f * 100)}%`;
     $('hud-xp-text').textContent = p.level >= MAX_LEVEL ? `${p.xp} XP (max level)` : `${p.xp} / ${next} XP${E.canLevelUp(p) ? ' — LEVEL UP!' : ''}`;
-    const port = $('hud-portrait'); port.style.background = p.color; port.textContent = CLASS_ICON[p.cls];
+    const port = $('hud-portrait'); port.style.background = p.color; port.innerHTML = icon(p.cls, null, 'big');
     const h = g.henchman;
     const hc = $('hud-hench');
     if (h) {
@@ -83,7 +89,7 @@ export class UI {
       $('hench-name').textContent = `${h.name} (Lv ${h.level} Ranger)${h.unconscious ? ' — down' : ''}`;
       $('hench-hp').style.width = `${Math.max(0, h.hp / hm * 100)}%`;
       $('hench-hp-text').textContent = `${h.hp} / ${hm}`;
-      const hp = $('hench-portrait'); hp.style.background = h.color; hp.textContent = '🏹';
+      const hp = $('hench-portrait'); hp.style.background = h.color; hp.innerHTML = icon('ranger', null, 'big');
     } else hc.classList.add('hidden');
     const eff = $('hud-effects'); eff.innerHTML = '';
     for (const e of p.effects) eff.appendChild(el('span', 'effect-chip' + (e.harmful || e.held || e.dot ? ' bad' : ''), `${esc(e.name)} (${e.remaining})`));
@@ -98,16 +104,16 @@ export class UI {
     const p = g.player;
     const qb = $('quickbar'); qb.innerHTML = '';
     const slots = [];
-    if (p.cls === 'barbarian') slots.push({ kind: 'ability', id: 'rage', name: 'Rage', icon: '🔥', count: p.rageUses });
-    if (p.cls === 'cleric') slots.push({ kind: 'ability', id: 'turn', name: 'Turn Undead', icon: '☀', count: p.turnUses });
-    for (const s of E.spellsKnown(p)) slots.push({ kind: 'spell', id: s.id, name: s.name, icon: SPELL_ICON[s.kind] || '✦', count: p.spellSlots[s.level] ? p.spellSlots[s.level].cur : 0, level: s.level });
+    if (p.cls === 'barbarian') slots.push({ kind: 'ability', id: 'rage', name: 'Rage', count: p.rageUses });
+    if (p.cls === 'cleric') slots.push({ kind: 'ability', id: 'turn', name: 'Turn Undead', count: p.turnUses });
+    for (const s of E.spellsKnown(p)) slots.push({ kind: 'spell', id: s.id, name: s.name, count: p.spellSlots[s.level] ? p.spellSlots[s.level].cur : 0, level: s.level });
     const potions = {};
     for (const it of p.inventory) if (ITEMS[it.id].type === 'potion') potions[it.id] = (potions[it.id] || 0) + it.qty;
-    for (const [id, n] of Object.entries(potions)) slots.push({ kind: 'potion', id, name: ITEMS[id].name.replace('Potion of ', ''), icon: '🧪', count: n });
+    for (const [id, n] of Object.entries(potions)) slots.push({ kind: 'potion', id, name: ITEMS[id].name.replace('Potion of ', ''), count: n });
     this.quickSlots = slots;
     slots.forEach((s, i) => {
       const d = el('div', `qb ${s.kind}${s.count <= 0 ? ' empty' : ''}`);
-      d.innerHTML = `<span class="key">${i < 9 ? i + 1 : ''}</span><span class="icon">${s.icon}</span><span>${esc(s.name)}</span><span class="count">${s.level ? 'L' + s.level + ' · ' : ''}${s.count}</span>`;
+      d.innerHTML = `<span class="key">${i < 9 ? i + 1 : ''}</span>${icon(s.id, 'potion', 'qb-icon')}<span class="qb-name">${esc(s.name)}</span><span class="count">${s.level ? 'L' + s.level + ' · ' : ''}${s.count}</span>`;
       d.onclick = () => this.useQuickSlot(i);
       d.onmouseenter = (ev) => this.showTooltip(ev, this.quickTooltip(s));
       d.onmousemove = (ev) => this.moveTooltip(ev);
@@ -123,7 +129,7 @@ export class UI {
     else if (s.kind === 'potion') g.drinkPotion(s.id);
   }
   quickTooltip(s) {
-    if (s.kind === 'spell') { const sp = SPELLS[s.id]; return `<div class="tname">${sp.name}</div><div>Level ${sp.level} ${sp.school}</div><div class="tdesc">${esc(sp.desc)}</div>`; }
+    if (s.kind === 'spell') { const sp = SPELLS[s.id]; return `<div class="tname">${icon(s.id)}${sp.name}</div><div>Level ${sp.level} ${sp.school}</div><div class="tdesc">${esc(sp.desc)}</div>`; }
     if (s.kind === 'potion') return this.itemTooltip(ITEMS[s.id]);
     if (s.id === 'rage') return `<div class="tname">Barbarian Rage</div><div class="tdesc">+4 STR, +4 CON, +2 Will, -2 AC for 5 rounds. ${s.count} uses left.</div>`;
     if (s.id === 'turn') return `<div class="tname">Turn Undead</div><div class="tdesc">Sears all undead within 4 tiles for 1d6 per level + CHA modifier (Will half). ${s.count} uses left.</div>`;
@@ -135,7 +141,7 @@ export class UI {
   moveTooltip(ev) { const t = $('tooltip'); const x = Math.min(ev.clientX + 14, window.innerWidth - 300), y = Math.min(ev.clientY + 14, window.innerHeight - t.offsetHeight - 10); t.style.left = x + 'px'; t.style.top = y + 'px'; }
   hideTooltip() { $('tooltip').classList.add('hidden'); }
   itemTooltip(it) {
-    let s = `<div class="tname">${esc(it.name)}</div>`;
+    let s = `<div class="tname">${icon(it.id, it.type)}${esc(it.name)}</div>`;
     if (it.type === 'weapon') s += `<div>Damage ${it.damage}, crit ${it.crit[0] === 20 ? '20' : it.crit[0] + '-20'} x${it.crit[1]}${it.twoHanded ? ', two-handed' : ''}${it.ranged ? ', ranged' : ''}${it.finesse ? ', finesse' : ''}</div><div>Proficiency: ${it.group}</div>`;
     if (it.type === 'armor') s += `<div>Armor bonus +${it.ac}, max DEX bonus ${it.maxDex >= 99 ? 'unlimited' : '+' + it.maxDex} (${it.category})</div>`;
     if (it.type === 'shield') s += `<div>Shield bonus +${it.ac}</div>`;
@@ -164,7 +170,7 @@ export class UI {
     const g = this.game, p = g.player;
     const st = E.computeStats(p);
     const cd = CLASSES[p.cls], rd = RACES[p.race];
-    let h = `<h3>${esc(p.name)} — Level ${p.level} ${rd.name} ${cd.name}</h3>`;
+    let h = `<h3>${icon(p.cls)}${esc(p.name)} — Level ${p.level} ${rd.name} ${cd.name}</h3>`;
     if (E.canLevelUp(p)) h += `<button id="btn-levelup" class="primary" style="width:100%;margin:6px 0">Level Up to ${p.level + 1}!</button>`;
     h += `<div class="two-col">`;
     for (const ab of E.ABILITIES) h += `<div><span>${ab}</span><span>${E.ability(p, ab)} (${fmtMod(E.abilityMod(p, ab))})</span></div>`;
@@ -192,7 +198,7 @@ export class UI {
 
   renderInventory(body) {
     const g = this.game, p = g.player;
-    let h = `<div class="row"><span class="name">Gold</span><span class="gold">${p.gold}</span></div><h3>Equipped</h3>`;
+    let h = `<div class="row"><span class="name">${icon('gold')}Gold</span><span class="gold">${p.gold}</span></div><h3>Equipped</h3>`;
     body.innerHTML = h;
     for (const s of EQUIP_SLOTS) {
       const id = p.equipment[s];
@@ -226,7 +232,7 @@ export class UI {
       body.appendChild(el('div', 'muted', `Potions: ${h2.inventory.filter(i => ITEMS[i.id].type === 'potion').reduce((a, b) => a + b.qty, 0)}`));
     }
   }
-  itemLabel(it) { return `<span class="${it.magic ? 'item-magic' : it.quest ? 'item-quest' : ''}">${esc(it.name)}</span>`; }
+  itemLabel(it) { return `<span class="${it.magic ? 'item-magic' : it.quest ? 'item-quest' : ''}">${icon(it.id, it.type)}${esc(it.name)}</span>`; }
 
   renderSpells(body) {
     const g = this.game, p = g.player;
@@ -236,7 +242,7 @@ export class UI {
     for (const s of known) {
       if (s.level !== lvl) { lvl = s.level; const slot = p.spellSlots[lvl]; body.appendChild(el('h3', '', `Level ${lvl} — ${slot ? slot.cur + ' / ' + slot.max : 0} slots`)); }
       const row = el('div', 'spell-row');
-      row.innerHTML = `<div><span class="sname">${s.name}</span> <span class="muted">${s.school} · ${s.target === 'self' ? 'self' : s.target}${s.range ? ', range ' + s.range : ''}${s.area ? ', radius ' + s.area : ''}</span></div><div class="sdesc">${esc(s.desc)}</div>`;
+      row.innerHTML = `<div><span class="sname">${icon(s.id)}${s.name}</span> <span class="muted">${s.school} · ${s.target === 'self' ? 'self' : s.target}${s.range ? ', range ' + s.range : ''}${s.area ? ', radius ' + s.area : ''}</span></div><div class="sdesc">${esc(s.desc)}</div>`;
       row.onclick = () => { g.beginSpell(s.id); if (s.target !== 'self') this.closePanel(); };
       body.appendChild(row);
     }
@@ -288,7 +294,7 @@ export class UI {
     const e = this.modalData; const g = this.game;
     const body = $('modal-body'); body.innerHTML = '';
     if (!e.loot.gold && !e.loot.items.length) { body.appendChild(el('div', 'muted', 'Empty.')); return; }
-    if (e.loot.gold > 0) { const row = el('div', 'row', `<span class="name gold">${e.loot.gold} gold</span>`); const b = el('button', '', 'Take'); b.onclick = () => g.takeLoot(e, 'gold'); const a = el('div', 'actions'); a.appendChild(b); row.appendChild(a); body.appendChild(row); }
+    if (e.loot.gold > 0) { const row = el('div', 'row', `<span class="name gold">${icon('gold')}${e.loot.gold} gold</span>`); const b = el('button', '', 'Take'); b.onclick = () => g.takeLoot(e, 'gold'); const a = el('div', 'actions'); a.appendChild(b); row.appendChild(a); body.appendChild(row); }
     e.loot.items.forEach((id, i) => {
       const it = ITEMS[id];
       const row = el('div', 'row', `<span class="name">${this.itemLabel(it)}</span>`);
@@ -446,7 +452,7 @@ export class CharacterCreator {
     const races = $('cc-races'); races.innerHTML = '';
     for (const r of Object.values(RACES)) { const c = el('div', 'card' + (this.race === r.id ? ' selected' : ''), r.name); c.onclick = () => { this.race = r.id; this.skills = {}; this.render(); }; races.appendChild(c); }
     const classes = $('cc-classes'); classes.innerHTML = '';
-    for (const c of Object.values(CLASSES)) { const d = el('div', 'card' + (this.cls === c.id ? ' selected' : ''), c.name); d.onclick = () => { this.cls = c.id; this.skills = {}; this.applyRecommended(); this.render(); }; classes.appendChild(d); }
+    for (const c of Object.values(CLASSES)) { const d = el('div', 'card' + (this.cls === c.id ? ' selected' : ''), icon(c.id) + c.name); d.onclick = () => { this.cls = c.id; this.skills = {}; this.applyRecommended(); this.render(); }; classes.appendChild(d); }
     const rd = RACES[this.race];
     const used = this.pointsUsed();
     $('cc-points').textContent = `(${30 - used} points left)`;
