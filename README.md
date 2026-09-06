@@ -63,6 +63,19 @@ To regenerate the Flare assets from a flare-game checkout (needs Node and the `p
 node tools/build-assets.mjs /path/to/flare-game
 ```
 
+### Rendering your own art with Blender
+
+`tools/blender/render_iso.py` renders models through a camera that matches the Flare projection (one Blender unit is one map tile) and writes files the game loads from `assets/extra/`. It works inside Blender (`blender -b -P tools/blender/render_iso.py -- ...`) or with the `bpy` pip package.
+
+```
+python tools/blender/render_iso.py props                      # built-in well, log-cabin wall block, palisade
+python tools/blender/render_iso.py test-dirs                  # probe object in the 8 facing directions
+python tools/blender/render_iso.py creature --blend wolf.blend --object Wolf --name wolf \
+    --actions stance=Idle,run=Run,swing=Bite,hit=Hit,die=Death --frames 8 --scale 0.8
+```
+
+Props become tiles (the renderer uses `well`, `logblock` and `palisade` when present); creatures become animated sprite sheets in the same format as the Flare ones, listed in `assets/extra/sprites.json`. Point a monster at one with `sprite: 'wolf'` in `js/data/monsters.js`.
+
 ## Code layout
 
 ```
@@ -80,6 +93,7 @@ js/game/assets.js     art loader, direction and animation helpers
 js/game/avatar.js     equipment to avatar sprite layer mapping
 tools/build-assets.mjs builds assets/ from a flare-game checkout
 tools/build-icons.mjs  extracts the game-icons.net SVGs listed in js/data/icons.js
+tools/blender/render_iso.py renders props and animated creatures with Blender into assets/extra/
 js/game/ui.js         HUD, quickbar, panels, dialogue, shop, loot, level-up, character creation
 ```
 

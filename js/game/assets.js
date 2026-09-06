@@ -22,12 +22,37 @@ export class Assets {
         }
       };
       await Promise.all(Array.from({ length: 6 }, worker));
+      await this.loadExtras();
       this.ready = true;
     } catch (err) {
       this.error = err; this.ready = false;
       console.warn('Art assets unavailable, using procedural graphics:', err);
     }
     return this.ready;
+  }
+  /** Optional art rendered with tools/blender/render_iso.py: extra tiles (each with its own image) and sprites. */
+  async loadExtras() {
+    const base = this.base + 'extra/';
+    try {
+      const r = await fetch(base + 'tiles.json');
+      if (r.ok) {
+        const json = await r.json();
+        for (const [name, list] of Object.entries(json.tiles || {})) {
+          for (const t of list) if (t.img) t.image = await loadImage(base + t.img);
+          this.tiles[name] = list;
+        }
+      }
+    } catch (err) { console.warn('extra tiles not loaded:', err); }
+    try {
+      const r = await fetch(base + 'sprites.json');
+      if (r.ok) {
+        for (const name of await r.json()) {
+          const data = await (await fetch(`${base}${name}.json`)).json();
+          const img = await loadImage(base + (data.image || name + '.png'));
+          this.sprites[name] = { img, ...data };
+        }
+      }
+    } catch (err) { console.warn('extra sprites not loaded:', err); }
   }
   sprite(name) { return this.sprites[name] || null; }
   /** Pick a tile variant deterministically. */

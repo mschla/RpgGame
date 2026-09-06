@@ -176,7 +176,7 @@ export class Renderer {
     if (!tile) return false;
     const ctx = this.ctx; const [fx, fy] = this.assets.frameOf(tile, this.time);
     if (alpha !== 1) ctx.globalAlpha = alpha;
-    ctx.drawImage(this.assets.atlas, fx, fy, tile.w, tile.h, cx - tile.ox * scale, cy - tile.oy * scale, tile.w * scale, tile.h * scale);
+    ctx.drawImage(tile.image || this.assets.atlas, fx, fy, tile.w, tile.h, cx - tile.ox * scale, cy - tile.oy * scale, tile.w * scale, tile.h * scale);
     if (alpha !== 1) ctx.globalAlpha = 1;
     return true;
   }
@@ -232,7 +232,13 @@ export class Renderer {
   /** Lit wall faces sit on a rock tile's near (SE / SW) edges, facing the room in front of them. */
   drawWall(x, y, cx, cy, dim) {
     const set = this.wallSet(x, y);
-    if (set === 'block') { const t = this.assets.tile('wall_block', 0); if (t) this.blitBottom(t, cx, cy, dim); return; }
+    if (set === 'block') {
+      // Blender-rendered log walls and palisades when present (tools/blender/render_iso.py), Flare brick otherwise
+      const thick = this.isThick(x, y);
+      const custom = this.assets.tile(thick ? 'logblock' : 'palisade', 0);
+      if (custom) { this.blit(custom, cx, cy, dim); return; }
+      const t = this.assets.tile('wall_block', 0); if (t) this.blitBottom(t, cx, cy, dim); return;
+    }
     const open = (i, j) => !this.isWall(i, j);
     const seed = hash(x, y, 5);
     const fSE = open(x + 1, y), fSW = open(x, y + 1);
@@ -249,6 +255,12 @@ export class Renderer {
     const set = this.wallSet(rSE ? x + 1 : x, rSE ? y : y + 1) || '';
     const piece = rSE && rSW ? 'wall_corner_back' : rSE ? 'wall_back_a' : 'wall_back_b';
     this.blit(this.assets.tile(set + piece, hash(x, y, 6)), cx, cy, dim);
+  }
+  /** Part of a 2x2 block of wall tiles: a building rather than a fence line. */
+  isThick(x, y) {
+    const w = (i, j) => this.isWall(i, j);
+    for (const [dx, dy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) if (w(x + dx, y) && w(x, y + dy) && w(x + dx, y + dy)) return true;
+    return false;
   }
   /** Draw a tile so its image bottom sits on the diamond's bottom corner (for block tiles whose origin is at their top). */
   blitBottom(tile, cx, cy, alpha = 1) {
@@ -276,6 +288,7 @@ export class Renderer {
       else if (t.stairs) name = 'stairs';
       else if (t.bones) name = 'bones';
       else if (ch === '.') name = seed % 4 === 0 ? 'rock' : 'tuft';
+      if (t.well) name = 'well';
       if (name && this.blit(this.assets.tile(name, seed), cx, cy, dim)) return;
       if (t.well) { this.drawWellProcedural(cx, cy, dim); return; }
       return;
