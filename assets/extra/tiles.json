@@ -1,0 +1,1 @@
+{"tiles": {"well": [{"img": "well.png", "w": 98, "h": 136, "ox": 49, "oy": 119, "frames": [[0, 0, 0]]}], "logblock": [{"img": "logblock.png", "w": 108, "h": 168, "ox": 54, "oy": 141, "frames": [[0, 0, 0]]}], "palisade": [{"img": "palisade.png", "w": 88, "h": 141, "ox": 44, "oy": 118, "frames": [[0, 0, 0]]}]}}
