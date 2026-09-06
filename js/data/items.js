@@ -70,7 +70,7 @@ export const ITEMS = {
   gem_ruby: { name: 'Ruby', type: 'gem', value: 150, weight: 0, stack: true, desc: 'A blood-red gemstone.' },
   gem_sapphire: { name: 'Sapphire', type: 'gem', value: 250, weight: 0, stack: true, desc: 'A deep blue gemstone.' },
   wolf_pelt: { name: 'Wolf Pelt', type: 'misc', value: 15, weight: 3, stack: true, desc: 'A thick grey pelt. Could be sold to a trader.' },
-  antling_mandible: { name: 'Antling Mandible', type: 'misc', value: 1, weight: 0, stack: true, desc: 'Proof of a slain antling. Bram wants these.' },
+  rat_tail: { name: 'Rat Tail', type: 'misc', value: 1, weight: 0, stack: true, desc: 'Proof of a slain rat. Bram wants these.' },
 };
 
 export const EQUIP_SLOTS = ['weapon', 'armor', 'shield', 'ring', 'amulet', 'cloak', 'boots'];

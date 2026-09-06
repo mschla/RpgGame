@@ -62,7 +62,7 @@ const TILES = {
   bones: ['dungeon', range(176, 183)], sarcophagus: ['dungeon', [199, 194]], bed: ['dungeon', [203]],
   door_a: ['dungeon', [208]], door_b: ['dungeon', [209]], stairs: ['dungeon', [284, 285]], floor_decal: ['dungeon', [264]],
   floor_grass: ['grassland', range(16, 31)], floor_grass_alt: ['grassland', range(32, 47)],
-  floor_dirt: ['cave', range(16, 27)], floor_mud: ['cave', range(28, 39)], floor_planks: ['cave', range(32, 35)],
+  floor_dirt: ['cave', range(16, 23)], floor_mud: ['cave', range(24, 31)], floor_planks: ['cave', range(32, 35)],
   chest_closed: ['grassland', [297]], chest_open: ['grassland', [298]], sign: ['grassland', [138]],
   tree: ['grassland', [252, 253, 254, 255]], tree_pine: ['grassland', range(248, 251)], tree_pale: ['grassland', [242, 243]], tree_dead: ['grassland', range(244, 247)],
   bush: ['grassland', range(112, 117)], tuft: ['grassland', range(120, 127)], rock: ['grassland', range(128, 131)], spire: ['grassland', range(132, 135)],

@@ -1,14 +1,14 @@
 // Monster templates. hp is dice; attack is bonus; damage is dice string.
 export const MONSTERS = {
   giant_rat: {
-    name: 'Antling', sprite: 'antlion_small', spriteScale: 0.8, creatureType: 'animal', hp: '1d8+1', ac: 14, attack: 2, damage: '1d4', speed: 3.2, xp: 25,
+    name: 'Giant Rat', sprite: 'rat', spriteScale: 1.15, creatureType: 'animal', hp: '1d8+1', ac: 14, attack: 2, damage: '1d4', speed: 3.2, xp: 25,
     saves: { fort: 3, ref: 3, will: 1 }, aggro: 5, color: '#8a7a6a', shape: 'small', size: 0.6,
-    loot: { gold: [0, 2], items: [{ id: 'antling_mandible', chance: 1 }] },
+    loot: { gold: [0, 2], items: [{ id: 'rat_tail', chance: 1 }] },
   },
   dire_rat: {
-    name: 'Brood Antling', sprite: 'antlion_small', spriteScale: 1.05, creatureType: 'animal', hp: '2d8+3', ac: 15, attack: 4, damage: '1d6+1', speed: 3.4, xp: 60,
+    name: 'Dire Rat', sprite: 'rat', spriteScale: 1.35, creatureType: 'animal', hp: '2d8+3', ac: 15, attack: 4, damage: '1d6+1', speed: 3.4, xp: 60,
     saves: { fort: 4, ref: 4, will: 2 }, aggro: 6, color: '#5a4a3a', shape: 'small', size: 0.8,
-    loot: { gold: [0, 5], items: [{ id: 'antling_mandible', chance: 1 }] },
+    loot: { gold: [0, 5], items: [{ id: 'rat_tail', chance: 1 }] },
   },
   wolf: {
     name: 'Wolf', sprite: 'wolf', spriteScale: 1.0, creatureType: 'animal', hp: '2d8+4', ac: 14, attack: 3, damage: '1d6+1', speed: 3.6, xp: 70,

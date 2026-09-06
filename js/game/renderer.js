@@ -184,7 +184,7 @@ export class Renderer {
   // Which floor art a tile shows. Object tiles borrow the floor of a walkable neighbour.
   floorName(x, y, ch) {
     const a = this.game.area;
-    const direct = { '.': 'floor_grass', ',': 'floor_dirt', 'm': 'floor_mud', ':': 'floor_stone', '=': a.outdoor ? 'floor_planks' : 'floor_tile', 'r': 'floor_rug', '~': 'water', 's': 'floor_stone', 'b': 'floor_stone' };
+    const direct = { '.': 'floor_grass', ',': 'floor_dirt', 'm': 'floor_mud', ':': 'floor_stone', '=': this.assets.tiles.planks ? 'planks' : (a.outdoor ? 'floor_planks' : 'floor_tile'), 'r': 'floor_rug', '~': 'water', 's': 'floor_stone', 'b': 'floor_stone' };
     if (direct[ch]) {
       if (ch === '.' && hash(x, y, 3) % 5 === 0) return 'floor_grass_alt';
       return direct[ch];

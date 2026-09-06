@@ -191,7 +191,7 @@ export const DIALOGUES = {
         options: [{ text: 'Show me anyway.', action: (g) => g.openShop("Ysolde's Private Stock", SHOP_YSOLDE_MAGIC, 1.0), next: null }],
       },
       news: {
-        text: "\"Goblins on the south road, so no caravans, so my shelves are thin. Bram's got bugs in his cellar. Mara's still waiting for a boy who isn't coming home. And someone robbed the temple. Cheerful place, Bramblewick.\"",
+        text: "\"Goblins on the south road, so no caravans, so my shelves are thin. Bram's got rats. Mara's still waiting for a boy who isn't coming home. And someone robbed the temple. Cheerful place, Bramblewick.\"",
         options: [{ text: "Let's see your wares.", action: (g) => g.openShop("Ysolde's Goods", SHOP_YSOLDE, 1.0), next: null }, { text: 'Thanks.', next: null }],
       },
     },
@@ -251,7 +251,7 @@ export const DIALOGUES = {
   bram: {
     start: (g) => {
       if (g.questStage('rats') >= 3) return 'after';
-      if (g.questStage('rats') >= 1 && g.countItem('antling_mandible') >= 5) return 'tails';
+      if (g.questStage('rats') >= 1 && g.countItem('rat_tail') >= 5) return 'tails';
       if (g.questStage('rats') === 1) return 'active';
       return 'intro';
     },
@@ -266,10 +266,10 @@ export const DIALOGUES = {
         ],
       },
       rats: {
-        text: "\"Antlings. Burrowing insects the size of dogs, chewing through my stock. My last cellar boy came up screaming about one with mandibles like scythes. Clear them out and bring me five mandibles as proof and I'll pay fifty gold. Stairs are in the back corner.\"",
+        text: "\"Rats. Big ones. In the cellar, chewing through my stock. My last cellar boy came up screaming about a rat the size of a dog. Clear them out and bring me five tails as proof and I'll pay fifty gold. Stairs are in the back corner.\"",
         options: [
           { text: "Consider it done.", action: (g) => g.setQuest('rats', 1), next: 'accept' },
-          { text: "I don't do bugs.", next: null },
+          { text: "I don't do rats.", next: null },
         ],
       },
       accept: {
@@ -277,12 +277,12 @@ export const DIALOGUES = {
         options: [{ text: 'Right.', next: null }],
       },
       active: {
-        text: "\"Five mandibles, friend, and fifty gold is yours. The cellar stairs are in the corner.\"",
+        text: "\"Five tails, friend, and fifty gold is yours. The cellar stairs are in the corner.\"",
         options: [{ text: 'Working on it.', next: null }],
       },
       tails: {
-        text: "Bram grimaces at the handful of mandibles, then laughs. \"Ha! That's them. And the big one too, I hope. Here's your fifty, and a drink on the house.\"",
-        options: [{ text: 'Pleasure doing business.', action: (g) => { g.removeItem('antling_mandible', 5); g.addGold(50); g.completeQuest('rats'); }, next: null }],
+        text: "Bram grimaces at the handful of tails, then laughs. \"Ha! That's them. And the big one too, I hope. Here's your fifty, and a drink on the house.\"",
+        options: [{ text: 'Pleasure doing business.', action: (g) => { g.removeItem('rat_tail', 5); g.addGold(50); g.completeQuest('rats'); }, next: null }],
       },
       after: {
         text: "\"My cellar's quiet at last. Ale's on the house for you, always.\"",
@@ -405,7 +405,7 @@ export const DIALOGUES = {
   drunk: {
     start: () => 'intro',
     nodes: {
-      intro: { text: "\"Th' bugs... they've got a queen down there. Big as a hound. Saw her mandibles.\" He slumps back onto the table.", options: [{ text: 'Sleep it off.', next: null }] },
+      intro: { text: "\"Th' rats... they've got a queen down there. Big as a hound. Saw her eyes.\" He slumps back onto the table.", options: [{ text: 'Sleep it off.', next: null }] },
     },
   },
 };

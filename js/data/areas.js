@@ -168,7 +168,7 @@ function buildCellar() {
       { type: 'monster', tid: 'giant_rat', x: 15, y: 5 },
       { type: 'monster', tid: 'giant_rat', x: 4, y: 10 },
       { type: 'monster', tid: 'giant_rat', x: 10, y: 11 },
-      { type: 'monster', tid: 'dire_rat', x: 14, y: 10, name: 'Brood Mother' },
+      { type: 'monster', tid: 'dire_rat', x: 14, y: 10, name: 'Rat Matriarch' },
       { type: 'chest', x: 15, y: 9, loot: { gold: 18, items: ['potion_cure_light', 'dagger'] } },
     ],
   };

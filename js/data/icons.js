@@ -33,7 +33,7 @@ export const ICONS = {
   // ---- misc
   thieves_tools: 'delapouite/lockpicks', holy_symbol: 'lorc/holy-symbol', torch: 'delapouite/torch', silver_locket: 'delapouite/heart-necklace',
   goblin_chief_head: 'delapouite/goblin-head', crypt_key: 'lorc/skeleton-key', cult_letter: 'lorc/scroll-unfurled', gem_ruby: 'lorc/gems', gem_sapphire: 'lorc/crystal-bars',
-  wolf_pelt: 'delapouite/animal-hide', antling_mandible: 'lorc/insect-jaws', gold: 'delapouite/two-coins',
+  wolf_pelt: 'delapouite/animal-hide', rat_tail: 'delapouite/rat', gold: 'delapouite/two-coins',
   // ---- fallbacks by item type
   type_weapon: 'lorc/broadsword', type_armor: 'lorc/breastplate', type_shield: 'lorc/crenulated-shield', type_ring: 'delapouite/ring', type_amulet: 'lorc/gem-pendant',
   type_cloak: 'lucasms/cloak', type_boots: 'lorc/boots', type_potion: 'lorc/standing-potion', type_misc: 'lorc/swap-bag', type_key: 'lorc/skeleton-key', type_gem: 'lorc/gems',

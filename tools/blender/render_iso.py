@@ -14,8 +14,9 @@ Run inside Blender or with the pip `bpy` module:
     blender -b -P tools/blender/render_iso.py -- creature --blend wolf.blend --object Wolf --name wolf \
         --actions stance=Idle,run=Run,swing=Bite,hit=Hit,die=Death [--frames 8] [--scale 1.0] [--forward -Y]
 
-    # the built-in procedurally animated wolf (stance, run, swing, hit, die in 8 directions):
+    # the built-in procedurally animated creatures (stance, run, swing, hit, die in 8 directions):
     python tools/blender/render_iso.py --size 384 builtin wolf
+    python tools/blender/render_iso.py --size 384 builtin rat
 
     # sanity check of directions and lighting with a probe object:
     python tools/blender/render_iso.py test-dirs
@@ -122,7 +123,7 @@ def setup_lights(scene, cam):
 
 
 # ---------------------------------------------------------------- materials
-def material(name, color, roughness=0.8, noise=None, wave=None, bump=None):
+def material(name, color, roughness=0.8, noise=None, wave=None, bump=None, wave_axis='Z'):
     """Principled material; `noise` = (scale, dark_color) mixes a noise pattern, `wave` = (scale, dark_color)
     adds horizontal bands (logs, planks)."""
     m = bpy.data.materials.new(name)
@@ -146,7 +147,7 @@ def material(name, color, roughness=0.8, noise=None, wave=None, bump=None):
         else:
             tex = nodes.new('ShaderNodeTexWave')
             tex.wave_type = 'BANDS'
-            tex.bands_direction = 'Z'
+            tex.bands_direction = wave_axis
             tex.wave_profile = 'SAW'
             tex.inputs['Scale'].default_value = wave[0]
             tex.inputs['Distortion'].default_value = 0.6
@@ -253,7 +254,19 @@ def build_probe():
     cube((0, -0.55, 0.7), (0.2, 0.5, 0.2), nose, 'nose')
 
 
-PROPS = {'well': build_well, 'logblock': build_logblock, 'palisade': build_palisade}
+def build_planks():
+    """A flat floor of wooden planks covering one tile, for bridges and tavern floors."""
+    wood = material('planks', (0.21, 0.13, 0.06), wave=(22, (0.09, 0.05, 0.02)), bump=(40, 0.25), wave_axis='Y')
+    beam = material('beam', (0.14, 0.09, 0.04), wave=(14, (0.07, 0.04, 0.02)), wave_axis='X')
+    n = 7
+    for i in range(n):
+        x = -0.5 + (i + 0.5) / n
+        cube((x, 0, 0.035 + 0.004 * (i % 2)), (0.86 / n, 1.0, 0.05), wood, f'plank{i}')
+    cube((0, -0.47, 0.02), (1.0, 0.07, 0.06), beam, 'beam_a')
+    cube((0, 0.47, 0.02), (1.0, 0.07, 0.06), beam, 'beam_b')
+
+
+PROPS = {'well': build_well, 'logblock': build_logblock, 'palisade': build_palisade, 'planks': build_planks}
 
 
 # ---------------------------------------------------------------- built-in creature: wolf
@@ -401,7 +414,88 @@ def build_wolf():
     return root, pose
 
 
-CREATURES = {'wolf': build_wolf}
+def build_rat():
+    """A giant rat facing -Y, about two thirds of a tile long."""
+    fur = material('rat_fur', (0.24, 0.19, 0.15), noise=(18, (0.10, 0.08, 0.06)), bump=(70, 0.35))
+    fur_light = material('rat_belly', (0.42, 0.36, 0.30), noise=(18, (0.26, 0.22, 0.18)), bump=(70, 0.3))
+    skin = material('rat_skin', (0.55, 0.36, 0.34), roughness=0.6)
+    dark = material('rat_dark', (0.02, 0.02, 0.02), roughness=0.35)
+    root = pivot('Rat', (0, 0, 0), None)
+    body = pivot('pose', (0, 0, 0), root)
+    sphere((0, 0.02, 0.16), (0.15, 0.30, 0.14), fur, 'torso', body)
+    sphere((0, 0.14, 0.16), (0.15, 0.17, 0.15), fur, 'haunches', body)
+    sphere((0, -0.14, 0.15), (0.13, 0.15, 0.12), fur, 'chest', body)
+    sphere((0, 0.0, 0.10), (0.11, 0.26, 0.08), fur_light, 'belly', body)
+    head = pivot('head', (0, -0.30, 0.17), body)
+    sphere((0, -0.03, 0), (0.09, 0.14, 0.085), fur, 'skull', head)
+    sphere((0, -0.16, -0.02), (0.05, 0.10, 0.045), fur_light, 'snout', head)
+    sphere((0, -0.26, -0.025), (0.018, 0.02, 0.016), skin, 'nose', head)
+    for sx in (-1, 1):
+        sphere((sx * 0.055, -0.09, 0.02), (0.016, 0.014, 0.016), dark, f'eye{sx}', head)
+        sphere((sx * 0.07, 0.02, 0.08), (0.05, 0.018, 0.05), skin, f'ear{sx}', head)
+        sphere((sx * 0.07, 0.03, 0.08), (0.055, 0.012, 0.055), fur, f'ear_back{sx}', head)
+    legs = {}
+    for name, (x, y) in {'fl': (-0.10, -0.17), 'fr': (0.10, -0.17), 'bl': (-0.11, 0.16), 'br': (0.11, 0.16)}.items():
+        p = pivot('leg_' + name, (x, y, 0.13), body)
+        bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.028, depth=0.14, location=(0, 0, -0.06))
+        leg = bpy.context.active_object
+        leg.name = 'legmesh_' + name
+        leg.data.materials.append(fur)
+        leg.parent = p
+        sphere((0, -0.015, -0.13), (0.035, 0.05, 0.02), skin, 'paw_' + name, p)
+        legs[name] = p
+    tail = pivot('tail', (0, 0.30, 0.13), body)
+    for i, (y, z, r, ln, rx) in enumerate([(0.12, -0.03, 0.022, 0.26, -75), (0.34, -0.09, 0.015, 0.24, -95), (0.53, -0.10, 0.009, 0.18, -100)]):
+        bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=r, depth=ln, location=(0, y, z), rotation=(math.radians(rx), 0, 0))
+        seg = bpy.context.active_object
+        seg.name = f'tail{i}'
+        seg.data.materials.append(skin)
+        seg.parent = tail
+    bpy.context.view_layer.update()
+
+    def pose(anim, t):
+        w = 2 * math.pi * t
+        body.location = (0, 0, 0)
+        body.rotation_euler = (0, 0, 0)
+        head.rotation_euler = (0, 0, 0)
+        tail.rotation_euler = (0, 0, 0)
+        for p in legs.values():
+            p.rotation_euler = (0, 0, 0)
+        if anim == 'stance':
+            body.location = (0, 0, 0.006 * math.sin(w))
+            head.rotation_euler = (math.radians(7 * math.sin(w)), 0, math.radians(8 * math.sin(w / 2)))
+            tail.rotation_euler = (0, 0, math.radians(10 * math.sin(w)))
+        elif anim == 'run':
+            swing = math.radians(42)
+            for name, phase in (('fl', 0), ('br', 0), ('fr', math.pi), ('bl', math.pi)):
+                legs[name].rotation_euler.x = swing * math.sin(w + phase)
+            body.location = (0, 0, 0.02 * abs(math.sin(w)))
+            body.rotation_euler.x = math.radians(3 * math.sin(w))
+            tail.rotation_euler = (0, 0, math.radians(12 * math.sin(w)))
+        elif anim == 'swing':
+            k = math.sin(math.pi * t)
+            body.location = (0, -0.14 * k, 0.03 * k)
+            body.rotation_euler.x = math.radians(-8 * k)
+            head.rotation_euler.x = math.radians(24 * k)
+            legs['fl'].rotation_euler.x = math.radians(-45 * k)
+            legs['fr'].rotation_euler.x = math.radians(-45 * k)
+        elif anim == 'hit':
+            k = math.sin(math.pi * t)
+            body.location = (0, 0.06 * k, 0)
+            body.rotation_euler.x = math.radians(12 * k)
+            head.rotation_euler.x = math.radians(-18 * k)
+        elif anim == 'die':
+            k = min(1, t * 1.25)
+            e = 1 - (1 - k) ** 2
+            body.rotation_euler = (math.radians(-5 * e), math.radians(86 * e), 0)
+            body.location = (0.03 * e, 0, -0.11 * e)
+            head.rotation_euler.x = math.radians(15 * e)
+            for p in legs.values():
+                p.rotation_euler.x = math.radians(30 * e)
+    return root, pose
+
+
+CREATURES = {'wolf': build_wolf, 'rat': build_rat}
 
 
 

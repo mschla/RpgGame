@@ -718,7 +718,7 @@ export class Game {
     if (id === 'silver_locket' && this.questStage('locket') === 1) { this.setQuest('locket', 2); }
     if (id === 'silver_locket' && this.questStage('locket') === 0) { this.log('A tarnished silver locket. Someone in town may be missing it.', 'info'); }
     if (id === 'goblin_chief_head' && this.questStage('goblins') === 1) this.setQuest('goblins', 2);
-    if (id === 'antling_mandible' && this.questStage('rats') === 1 && E.countItem(this.player, 'antling_mandible') >= 5) this.setQuest('rats', 2);
+    if (id === 'rat_tail' && this.questStage('rats') === 1 && E.countItem(this.player, 'rat_tail') >= 5) this.setQuest('rats', 2);
   }
 
   // ------------------------------------------------------------ area transitions
@@ -986,7 +986,7 @@ export class Game {
       this.areas[id] = fresh;
     }
     // item ids renamed since the save was written
-    const LEGACY_ITEMS = { antlion_chitin: 'wolf_pelt' };
+    const LEGACY_ITEMS = { antlion_chitin: 'wolf_pelt', antling_mandible: 'rat_tail' };
     const migrate = (list) => { for (const it of list || []) if (LEGACY_ITEMS[it.id]) it.id = LEGACY_ITEMS[it.id]; };
     for (const c of [d.player, d.henchman]) if (c) migrate(c.inventory);
     for (const a of Object.values(this.areas)) for (const e of a.entities) { if (e.inventory) migrate(e.inventory); if (e.loot && e.loot.items) e.loot.items = e.loot.items.map(id => LEGACY_ITEMS[id] || id); }

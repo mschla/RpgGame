@@ -16,7 +16,7 @@ Then open <http://localhost:8000/>. It also works when published on GitHub Pages
 
 ## The game
 
-You arrive in the town of Bramblewick. Goblins raid the south road, antlings infest the tavern cellar, a widow's son never came home from the woods, and someone has stolen the Amulet of Dawn from the temple. The trail leads through the Whispering Woods to the Sunken Crypt, where the Pale Hand cult and the necromancer Malachar wait.
+You arrive in the town of Bramblewick. Goblins raid the south road, rats infest the tavern cellar, a widow's son never came home from the woods, and someone has stolen the Amulet of Dawn from the temple. The trail leads through the Whispering Woods to the Sunken Crypt, where the Pale Hand cult and the necromancer Malachar wait.
 
 Five areas: Bramblewick, the Rusty Tankard tavern, its cellar, the Whispering Woods and the Sunken Crypt. Five quests, a hireable ranger companion, shops, a temple healer, a locked sanctum, trapped corridors, wolves and fire ants in the woods, a minotaur in a cave, and a final boss who raises the dead.
 
@@ -68,7 +68,8 @@ node tools/build-assets.mjs /path/to/flare-game
 `tools/blender/render_iso.py` renders models through a camera that matches the Flare projection (one Blender unit is one map tile) and writes files the game loads from `assets/extra/`. It works inside Blender (`blender -b -P tools/blender/render_iso.py -- ...`) or with the `bpy` pip package.
 
 ```
-python tools/blender/render_iso.py props                      # built-in well, log-cabin wall block, palisade
+python tools/blender/render_iso.py props                      # built-in well, log-cabin wall block, palisade, planks
+python tools/blender/render_iso.py --size 384 builtin wolf    # animated wolf; also: builtin rat
 python tools/blender/render_iso.py test-dirs                  # probe object in the 8 facing directions
 python tools/blender/render_iso.py creature --blend wolf.blend --object Wolf --name wolf \
     --actions stance=Idle,run=Run,swing=Bite,hit=Hit,die=Death --frames 8 --scale 0.8

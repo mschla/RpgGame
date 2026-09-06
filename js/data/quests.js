@@ -1,10 +1,10 @@
 export const QUESTS = {
   rats: {
-    name: 'Vermin in the Cellar', xp: 150,
+    name: 'Rats in the Cellar', xp: 150,
     stages: {
-      1: 'Bram, the innkeeper of the Rusty Tankard, has antlings nesting in his cellar. He will pay for five antling mandibles.',
-      2: 'I have collected enough antling mandibles. I should return to Bram for my reward.',
-      3: 'Bram paid me for clearing out his cellar. The Rusty Tankard is free of vermin, for now.',
+      1: 'Bram, the innkeeper of the Rusty Tankard, is overrun with rats in his cellar. He will pay for five rat tails.',
+      2: 'I have collected enough rat tails. I should return to Bram for my reward.',
+      3: 'Bram paid me for clearing out his cellar. The Rusty Tankard is rat-free, for now.',
     },
     done: 3,
   },
