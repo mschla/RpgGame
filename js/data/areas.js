@@ -213,14 +213,14 @@ function buildForest() {
     entities: [
       { type: 'transition', x: 24, y: 0, w: 2, to: 'town', tx: 20, ty: 29, label: 'Back to Bramblewick' },
       { type: 'transition', x: 24, y: 43, w: 2, to: 'crypt', tx: 20, ty: 1, label: 'The Sunken Crypt' },
-      { type: 'sign', x: 26, y: 3, label: 'Bramblewick north. Beware: goblins east, antlions west.' },
+      { type: 'sign', x: 26, y: 3, label: 'Bramblewick north. Beware: goblins east, wolves west.' },
       // bandits on the road
       { type: 'monster', tid: 'bandit', x: 19, y: 15 },
       { type: 'monster', tid: 'bandit', x: 22, y: 16 },
       { type: 'monster', tid: 'bandit', x: 21, y: 19, name: 'Bandit Leader' },
       // wolves
       { type: 'monster', tid: 'wolf', x: 8, y: 12 }, { type: 'monster', tid: 'wolf', x: 11, y: 15 }, { type: 'monster', tid: 'wolf', x: 6, y: 16 },
-      { type: 'monster', tid: 'dire_wolf', x: 5, y: 13, name: 'Old Greymandible' },
+      { type: 'monster', tid: 'dire_wolf', x: 5, y: 13, name: 'Old Greymane' },
       { type: 'chest', x: 4, y: 10, loot: { gold: 25, items: ['silver_locket', 'potion_cure_light'] } },
       // shrine
       { type: 'monster', tid: 'giant_spider', x: 38, y: 8 }, { type: 'monster', tid: 'giant_spider', x: 41, y: 9 },

@@ -14,6 +14,9 @@ Run inside Blender or with the pip `bpy` module:
     blender -b -P tools/blender/render_iso.py -- creature --blend wolf.blend --object Wolf --name wolf \
         --actions stance=Idle,run=Run,swing=Bite,hit=Hit,die=Death [--frames 8] [--scale 1.0] [--forward -Y]
 
+    # the built-in procedurally animated wolf (stance, run, swing, hit, die in 8 directions):
+    python tools/blender/render_iso.py --size 384 builtin wolf
+
     # sanity check of directions and lighting with a probe object:
     python tools/blender/render_iso.py test-dirs
 
@@ -242,6 +245,121 @@ def build_probe():
 PROPS = {'well': build_well, 'logblock': build_logblock, 'palisade': build_palisade}
 
 
+# ---------------------------------------------------------------- built-in creature: wolf
+def sphere(loc, scale, mat, name, parent):
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=20, ring_count=12, radius=1, location=loc)
+    o = bpy.context.active_object
+    o.scale = scale
+    o.name = name
+    o.data.materials.append(mat)
+    o.parent = parent
+    bpy.ops.object.shade_smooth()
+    return o
+
+
+def pivot(name, loc, parent):
+    e = bpy.data.objects.new(name, None)
+    e.location = loc
+    e.parent = parent
+    bpy.context.scene.collection.objects.link(e)
+    return e
+
+
+def build_wolf():
+    """A low-poly grey wolf facing -Y, about one tile long. Returns (root, pose) where pose(anim, t)
+    sets the procedural animation for normalized time t in [0, 1]."""
+    fur = material('fur', (0.27, 0.25, 0.22), noise=(9, (0.12, 0.11, 0.10)))
+    belly = material('belly', (0.52, 0.48, 0.42), noise=(9, (0.34, 0.31, 0.28)))
+    dark = material('dark', (0.03, 0.03, 0.03), roughness=0.4)
+    root = pivot('Wolf', (0, 0, 0), None)
+    body = pivot('pose', (0, 0, 0), root)
+    sphere((0, 0.05, 0.50), (0.16, 0.50, 0.19), fur, 'torso', body)
+    sphere((0, -0.32, 0.53), (0.18, 0.24, 0.22), fur, 'chest', body)
+    sphere((0, 0.38, 0.50), (0.15, 0.20, 0.18), fur, 'hips', body)
+    sphere((0, 0.02, 0.41), (0.12, 0.42, 0.12), belly, 'belly', body)
+    neck = pivot('neck', (0, -0.50, 0.62), body)
+    sphere((0, -0.03, 0.0), (0.11, 0.16, 0.12), fur, 'neck_mesh', neck)
+    head = pivot('head', (0, -0.17, 0.08), neck)
+    sphere((0, 0, 0), (0.14, 0.16, 0.13), fur, 'skull', head)
+    sphere((0, -0.19, -0.04), (0.075, 0.15, 0.065), fur, 'snout', head)
+    sphere((0, -0.33, -0.03), (0.035, 0.035, 0.03), dark, 'nose', head)
+    for sx in (-1, 1):
+        sphere((sx * 0.055, -0.09, 0.05), (0.025, 0.02, 0.02), dark, f'eye{sx}', head)
+        bpy.ops.mesh.primitive_cone_add(vertices=8, radius1=0.05, radius2=0, depth=0.16, location=(sx * 0.085, 0.02, 0.15))
+        ear = bpy.context.active_object
+        ear.name = f'ear{sx}'
+        ear.rotation_euler = (math.radians(-15), math.radians(sx * 20), 0)
+        ear.data.materials.append(fur)
+        ear.parent = head
+    legs = {}
+    for name, (x, y) in {'fl': (-0.11, -0.32), 'fr': (0.11, -0.32), 'bl': (-0.11, 0.34), 'br': (0.11, 0.34)}.items():
+        p = pivot('leg_' + name, (x, y, 0.44), body)
+        bpy.ops.mesh.primitive_cylinder_add(vertices=10, radius=0.05, depth=0.44, location=(0, 0, -0.22))
+        leg = bpy.context.active_object
+        leg.name = 'legmesh_' + name
+        leg.data.materials.append(fur)
+        leg.parent = p
+        sphere((0, -0.02, -0.44), (0.055, 0.075, 0.035), dark, 'paw_' + name, p)
+        legs[name] = p
+    tail = pivot('tail', (0, 0.54, 0.54), body)
+    bpy.ops.mesh.primitive_cylinder_add(vertices=8, radius=0.05, depth=0.36, location=(0, 0.13, -0.11), rotation=(math.radians(-50), 0, 0))
+    t = bpy.context.active_object
+    t.name = 'tail_mesh'
+    t.data.materials.append(fur)
+    t.parent = tail
+    bpy.context.view_layer.update()
+
+    def pose(anim, t):
+        w = 2 * math.pi * t
+        body.location = (0, 0, 0)
+        body.rotation_euler = (0, 0, 0)
+        neck.rotation_euler = (0, 0, 0)
+        head.rotation_euler = (0, 0, 0)
+        tail.rotation_euler = (0, 0, 0)
+        for p in legs.values():
+            p.rotation_euler = (0, 0, 0)
+        if anim == 'stance':
+            body.location = (0, 0, 0.012 * math.sin(w))
+            head.rotation_euler = (math.radians(4 * math.sin(w)), 0, 0)
+            tail.rotation_euler = (0, 0, math.radians(12 * math.sin(w)))
+        elif anim == 'run':
+            swing = math.radians(38)
+            legs['fl'].rotation_euler.x = swing * math.sin(w)
+            legs['br'].rotation_euler.x = swing * math.sin(w)
+            legs['fr'].rotation_euler.x = -swing * math.sin(w)
+            legs['bl'].rotation_euler.x = -swing * math.sin(w)
+            body.location = (0, 0, 0.035 * abs(math.sin(w)))
+            body.rotation_euler.x = math.radians(4 * math.sin(w))
+            neck.rotation_euler.x = math.radians(-8)
+            tail.rotation_euler.x = math.radians(15)
+        elif anim == 'swing':
+            k = math.sin(math.pi * t)           # lunge out and back
+            body.location = (0, -0.18 * k, 0.04 * k)
+            body.rotation_euler.x = math.radians(-8 * k)
+            neck.rotation_euler.x = math.radians(18 * k)
+            head.rotation_euler.x = math.radians(25 * k)
+            legs['fl'].rotation_euler.x = math.radians(-40 * k)
+            legs['fr'].rotation_euler.x = math.radians(-40 * k)
+        elif anim == 'hit':
+            k = math.sin(math.pi * t)
+            body.location = (0, 0.08 * k, 0)
+            body.rotation_euler.x = math.radians(10 * k)
+            head.rotation_euler.x = math.radians(-20 * k)
+        elif anim == 'die':
+            k = min(1, t * 1.25)
+            e = 1 - (1 - k) ** 2
+            body.rotation_euler = (math.radians(-6 * e), math.radians(88 * e), 0)
+            body.location = (0.05 * e, 0, -0.36 * e)
+            neck.rotation_euler.x = math.radians(20 * e)
+            for p in legs.values():
+                p.rotation_euler.x = math.radians(25 * e)
+    return root, pose
+
+
+CREATURES = {'wolf': build_wolf}
+
+
+
 # ---------------------------------------------------------------- rendering helpers
 def render_frame(scene, path):
     scene.render.filepath = path
@@ -403,6 +521,31 @@ ANIM_TYPES = {'stance': 'back_forth', 'run': 'looped', 'swing': 'play_once', 'sh
 ANIM_DURATIONS = {'stance': 800, 'run': 533, 'swing': 400, 'shoot': 400, 'cast': 400, 'hit': 200, 'die': 800}
 
 
+def cmd_builtin(args):
+    """Render a built-in procedurally animated creature."""
+    os.makedirs(args.out, exist_ok=True)
+    clear_scene()
+    scene = setup_render(args.engine, args.size)
+    if args.engine == 'CYCLES':
+        scene.cycles.samples = args.samples
+    cam = setup_camera(scene, args.size)
+    setup_lights(scene, cam)
+    root, pose = CREATURES[args.name]()
+    root.scale = (args.scale, args.scale, args.scale)
+    counts = {'stance': 4, 'run': 8, 'swing': 4, 'hit': 2, 'die': 6}
+    anims = {}
+    for anim, n in counts.items():
+        looped = ANIM_TYPES[anim] == 'looped'
+
+        def frames_cb(anim=anim, n=n, looped=looped):
+            for i in range(n):
+                pose(anim, i / (n if looped else max(1, n - 1)))
+                yield i
+        anims[anim] = render_directions(scene, cam, root, '-Y', frames_cb, args.size)
+        print(f'rendered {anim} ({n} frames x 8 directions)')
+    write_sprite(args.out, args.name, anims, ANIM_DURATIONS, ANIM_TYPES, args.webp)
+
+
 def cmd_creature(args):
     os.makedirs(args.out, exist_ok=True)
     bpy.ops.wm.open_mainfile(filepath=os.path.abspath(args.blend))
@@ -452,9 +595,14 @@ def main():
     c.add_argument('--scale', type=float, default=1.0, help='model scale so that 1 unit = 1 map tile')
     c.add_argument('--forward', default='-Y', choices=['-Y', '+Y', '+X', '-X'], help="the model's forward axis")
     c.add_argument('--webp', action='store_true')
+    b = sub.add_parser('builtin', help=f'render a built-in animated creature: {", ".join(CREATURES)}')
+    b.add_argument('name', choices=list(CREATURES))
+    b.add_argument('--scale', type=float, default=1.0)
+    b.add_argument('--samples', type=int, default=32)
+    b.add_argument('--webp', action='store_true')
     args = ap.parse_args(argv)
     args.out = os.path.abspath(args.out)
-    {'props': cmd_props, 'test-dirs': cmd_test_dirs, 'creature': cmd_creature}[args.cmd](args)
+    {'props': cmd_props, 'test-dirs': cmd_test_dirs, 'creature': cmd_creature, 'builtin': cmd_builtin}[args.cmd](args)
 
 
 if __name__ == '__main__':

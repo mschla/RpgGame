@@ -18,7 +18,7 @@ Then open <http://localhost:8000/>. It also works when published on GitHub Pages
 
 You arrive in the town of Bramblewick. Goblins raid the south road, antlings infest the tavern cellar, a widow's son never came home from the woods, and someone has stolen the Amulet of Dawn from the temple. The trail leads through the Whispering Woods to the Sunken Crypt, where the Pale Hand cult and the necromancer Malachar wait.
 
-Five areas: Bramblewick, the Rusty Tankard tavern, its cellar, the Whispering Woods and the Sunken Crypt. Five quests, a hireable ranger companion, shops, a temple healer, a locked sanctum, trapped corridors, antlions and fire ants in the woods, a minotaur in a cave, and a final boss who raises the dead.
+Five areas: Bramblewick, the Rusty Tankard tavern, its cellar, the Whispering Woods and the Sunken Crypt. Five quests, a hireable ranger companion, shops, a temple healer, a locked sanctum, trapped corridors, wolves and fire ants in the woods, a minotaur in a cave, and a final boss who raises the dead.
 
 ### Character creation
 

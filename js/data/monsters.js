@@ -11,14 +11,14 @@ export const MONSTERS = {
     loot: { gold: [0, 5], items: [{ id: 'antling_mandible', chance: 1 }] },
   },
   wolf: {
-    name: 'Antlion', sprite: 'antlion', spriteScale: 0.85, creatureType: 'animal', hp: '2d8+4', ac: 14, attack: 3, damage: '1d6+1', speed: 3.6, xp: 70,
+    name: 'Wolf', sprite: 'wolf', spriteScale: 1.0, creatureType: 'animal', hp: '2d8+4', ac: 14, attack: 3, damage: '1d6+1', speed: 3.6, xp: 70,
     saves: { fort: 5, ref: 5, will: 1 }, aggro: 7, color: '#777', shape: 'beast', size: 0.9,
-    loot: { gold: [0, 0], items: [{ id: 'antlion_chitin', chance: 0.6 }] },
+    loot: { gold: [0, 0], items: [{ id: 'wolf_pelt', chance: 0.6 }] },
   },
   dire_wolf: {
-    name: 'Antlion Matriarch', sprite: 'antlion', spriteScale: 1.15, creatureType: 'animal', hp: '6d8+18', ac: 14, attack: 11, damage: '1d8+10', speed: 3.6, xp: 300,
+    name: 'Dire Wolf', sprite: 'wolf', spriteScale: 1.3, creatureType: 'animal', hp: '6d8+18', ac: 14, attack: 11, damage: '1d8+10', speed: 3.6, xp: 300,
     saves: { fort: 8, ref: 8, will: 6 }, aggro: 8, color: '#444', shape: 'beast', size: 1.3,
-    loot: { gold: [0, 0], items: [{ id: 'antlion_chitin', chance: 1 }, { id: 'antlion_chitin', chance: 0.5 }] },
+    loot: { gold: [0, 0], items: [{ id: 'wolf_pelt', chance: 1 }, { id: 'wolf_pelt', chance: 0.5 }] },
   },
   giant_spider: {
     name: 'Giant Fire Ant', sprite: 'fire_ant', spriteScale: 0.9, creatureType: 'vermin', hp: '4d8+4', ac: 14, attack: 4, damage: '1d8+3', speed: 3.0, xp: 150,

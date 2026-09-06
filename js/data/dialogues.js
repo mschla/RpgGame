@@ -214,7 +214,7 @@ export const DIALOGUES = {
         ],
       },
       tam: {
-        text: "\"He went hunting west of the road, near the old antlion nest. That was in spring. The guards found his bow but not him, and not the locket he wore. It had my husband's picture in it.\" She grips your arm. \"If you find it, bring it to me. Please. I have thirty gold saved.\"",
+        text: "\"He went hunting west of the road, near the old wolf den. That was in spring. The guards found his bow but not him, and not the locket he wore. It had my husband's picture in it.\" She grips your arm. \"If you find it, bring it to me. Please. I have thirty gold saved.\"",
         options: [
           { text: "I'll look for it. Keep your gold.", action: (g) => { g.setQuest('locket', 1); g.setFlag('locket_noble', true); }, next: 'thanks' },
           { text: "I'll look for it.", action: (g) => g.setQuest('locket', 1), next: 'thanks' },
@@ -222,11 +222,11 @@ export const DIALOGUES = {
         ],
       },
       thanks: {
-        text: "\"Thank you. Thank you. Be careful of the antlions.\"",
+        text: "\"Thank you. Thank you. Be careful of the wolves.\"",
         options: [{ text: 'I will.', next: null }],
       },
       active: {
-        text: "\"Any sign of the locket? It was near the antlion nest, west of the road.\"",
+        text: "\"Any sign of the locket? It was near the wolf den, west of the road.\"",
         options: [{ text: 'Not yet.', next: null }],
       },
       found: {
@@ -296,7 +296,7 @@ export const DIALOGUES = {
         options: [{ text: 'Interesting.', next: null }],
       },
       rumors: {
-        text: "\"Old Greymandible's back in the western woods, an antlion the size of a pony. And a minotaur's moved into the cave past the river. Then there's the crypt in the south hills. Folk say lights have been seen there at night. Nobody goes near it.\"",
+        text: "\"Old Greymane's back in the western woods, a dire wolf the size of a pony. And a minotaur's moved into the cave past the river. Then there's the crypt in the south hills. Folk say lights have been seen there at night. Nobody goes near it.\"",
         options: [{ text: 'Thanks for the warning.', next: null }],
       },
     },

@@ -158,7 +158,7 @@ export function itemBonus(c, key) {
   if (!c.equipment) return 0;
   let t = 0;
   for (const it of equippedItems(c)) if (it.bonus && typeof it.bonus[key] === 'number') t += it.bonus[key];
-  for (const inv of (c.inventory || [])) { const it = ITEMS[inv.id]; if (it.type === 'misc' && it.bonus && typeof it.bonus[key] === 'number') t += it.bonus[key]; }
+  for (const inv of (c.inventory || [])) { const it = ITEMS[inv.id]; if (it && it.type === 'misc' && it.bonus && typeof it.bonus[key] === 'number') t += it.bonus[key]; }
   return t;
 }
 

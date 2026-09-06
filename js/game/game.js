@@ -985,6 +985,11 @@ export class Game {
       fresh.explored = Uint8Array.from(a.explored);
       this.areas[id] = fresh;
     }
+    // item ids renamed since the save was written
+    const LEGACY_ITEMS = { antlion_chitin: 'wolf_pelt' };
+    const migrate = (list) => { for (const it of list || []) if (LEGACY_ITEMS[it.id]) it.id = LEGACY_ITEMS[it.id]; };
+    for (const c of [d.player, d.henchman]) if (c) migrate(c.inventory);
+    for (const a of Object.values(this.areas)) for (const e of a.entities) { if (e.inventory) migrate(e.inventory); if (e.loot && e.loot.items) e.loot.items = e.loot.items.map(id => LEGACY_ITEMS[id] || id); }
     this.player = d.player; this.henchman = d.henchman; this.henchmanMode = d.henchmanMode || 'follow';
     this.quests = d.quests; this.flags = d.flags; this.time = d.time; this.clock = d.clock;
     this.area = this.areas[d.currentArea];

@@ -29,8 +29,8 @@ export const QUESTS = {
   locket: {
     name: 'The Silver Locket', xp: 200,
     stages: {
-      1: 'Mara\'s son Tam went hunting in the Whispering Woods and never returned. She asked me to look for the silver locket he carried, somewhere near the antlion nest to the west.',
-      2: 'I found Tam\'s silver locket in the antlion nest. I should bring it to Mara.',
+      1: 'Mara\'s son Tam went hunting in the Whispering Woods and never returned. She asked me to look for the silver locket he carried, somewhere near the wolves\' den to the west.',
+      2: 'I found Tam\'s silver locket in the wolf den. I should bring it to Mara.',
       3: 'I returned Tam\'s locket to Mara. She can grieve properly now.',
     },
     done: 3,
