@@ -25,6 +25,7 @@ export const TILE = {
   'm': { name: 'mud', walk: true, opaque: false, color: '#5a4a34', alt: '#614f38' },
   'S': { name: 'stump', walk: false, opaque: false, color: '#4d7a3a', stump: true },
   'W': { name: 'well', walk: false, opaque: false, color: '#8a7a5a', well: true },
+  'K': { name: 'sarcophagus', walk: false, opaque: false, color: '#5c5a62', altar: true, sarcophagus: true },
 };
 
 class MapBuilder {
@@ -110,14 +111,14 @@ function buildTown() {
     id: 'town', name: 'Bramblewick', outdoor: true, width: W, height: H, tiles: b.build(), start: [20, 10],
     ambient: '#000000',
     entities: [
-      { type: 'npc', id: 'captain', name: 'Captain Harlan', x: 23, y: 14, dialogue: 'captain', color: '#3a5a9a', shape: 'humanoid', weapon: 'blade', armor: true },
-      { type: 'npc', id: 'priest', name: 'Father Aldric', x: 18, y: 9, dialogue: 'priest', color: '#e8e0c0', shape: 'humanoid', weapon: 'staff' },
-      { type: 'npc', id: 'merchant', name: 'Ysolde the Trader', x: 33, y: 10, dialogue: 'merchant', color: '#9a6a2a', shape: 'humanoid' },
-      { type: 'npc', id: 'mara', name: 'Mara', x: 9, y: 22, dialogue: 'mara', color: '#6a6a8a', shape: 'humanoid' },
-      { type: 'npc', id: 'guard1', name: 'Town Guard', x: 18, y: 29, dialogue: 'guard', color: '#4a5a8a', shape: 'humanoid', weapon: 'spear', armor: true },
-      { type: 'npc', id: 'guard2', name: 'Town Guard', x: 22, y: 29, dialogue: 'guard', color: '#4a5a8a', shape: 'humanoid', weapon: 'spear', armor: true },
-      { type: 'npc', id: 'villager1', name: 'Villager', x: 12, y: 13, dialogue: 'villager', color: '#8a7a6a', shape: 'humanoid' },
-      { type: 'npc', id: 'villager2', name: 'Old Fisherman', x: 13, y: 26, dialogue: 'fisherman', color: '#6a7a8a', shape: 'humanoid' },
+      { type: 'npc', id: 'captain', name: 'Captain Harlan', x: 23, y: 14, dialogue: 'captain', sprite: 'knight', color: '#3a5a9a', shape: 'humanoid', weapon: 'blade', armor: true },
+      { type: 'npc', id: 'priest', name: 'Father Aldric', x: 18, y: 9, dialogue: 'priest', sprite: 'guild_man', color: '#e8e0c0', shape: 'humanoid', weapon: 'staff' },
+      { type: 'npc', id: 'merchant', name: 'Ysolde the Trader', x: 33, y: 10, dialogue: 'merchant', sprite: 'peasant_woman1', color: '#9a6a2a', shape: 'humanoid' },
+      { type: 'npc', id: 'mara', name: 'Mara', x: 9, y: 22, dialogue: 'mara', sprite: 'peasant_woman2', color: '#6a6a8a', shape: 'humanoid' },
+      { type: 'npc', id: 'guard1', name: 'Town Guard', x: 18, y: 29, dialogue: 'guard', sprite: 'knight', color: '#4a5a8a', shape: 'humanoid', weapon: 'spear', armor: true },
+      { type: 'npc', id: 'guard2', name: 'Town Guard', x: 22, y: 29, dialogue: 'guard', sprite: 'knight', color: '#4a5a8a', shape: 'humanoid', weapon: 'spear', armor: true },
+      { type: 'npc', id: 'villager1', name: 'Villager', x: 12, y: 13, dialogue: 'villager', sprite: 'peasant_man1', color: '#8a7a6a', shape: 'humanoid' },
+      { type: 'npc', id: 'villager2', name: 'Old Fisherman', x: 13, y: 26, dialogue: 'fisherman', sprite: 'peasant_man2', color: '#6a7a8a', shape: 'humanoid' },
       { type: 'transition', x: 8, y: 9, to: 'tavern', tx: 9, ty: 10, label: 'The Rusty Tankard' },
       { type: 'transition', x: 19, y: 31, w: 3, to: 'forest', tx: 24, ty: 1, label: 'To the Whispering Woods' },
       { type: 'sign', x: 30, y: 10, label: "Ysolde's Goods - Weapons, Armor, Sundries" },
@@ -140,9 +141,9 @@ function buildTavern() {
   return {
     id: 'tavern', name: 'The Rusty Tankard', outdoor: false, width: W, height: H, tiles: b.build(), start: [9, 10],
     entities: [
-      { type: 'npc', id: 'bram', name: 'Bram the Innkeeper', x: 4, y: 3, dialogue: 'bram', color: '#a05a3a', shape: 'humanoid' },
-      { type: 'npc', id: 'tomas', name: 'Tomas', x: 12, y: 5, dialogue: 'tomas', color: '#3a6a3a', shape: 'humanoid', weapon: 'bow', henchman: true },
-      { type: 'npc', id: 'drunk', name: 'Drunk Patron', x: 16, y: 9, dialogue: 'drunk', color: '#8a6a5a', shape: 'humanoid' },
+      { type: 'npc', id: 'bram', name: 'Bram the Innkeeper', x: 4, y: 3, dialogue: 'bram', sprite: 'wandering_trader', color: '#a05a3a', shape: 'humanoid' },
+      { type: 'npc', id: 'tomas', name: 'Tomas', x: 12, y: 5, dialogue: 'tomas', avatar: { gender: 'male', chest: 'leather_chest', legs: 'leather_pants', feet: 'leather_boots', main: 'longbow' }, color: '#3a6a3a', shape: 'humanoid', weapon: 'bow', henchman: true },
+      { type: 'npc', id: 'drunk', name: 'Drunk Patron', x: 16, y: 9, dialogue: 'drunk', sprite: 'peasant_man2', color: '#8a6a5a', shape: 'humanoid' },
       { type: 'transition', x: 9, y: 12, to: 'town', tx: 8, ty: 10, label: 'Leave the tavern' },
       { type: 'transition', x: 18, y: 10, to: 'cellar', tx: 2, ty: 2, label: 'Down to the cellar' },
     ],
@@ -167,7 +168,7 @@ function buildCellar() {
       { type: 'monster', tid: 'giant_rat', x: 15, y: 5 },
       { type: 'monster', tid: 'giant_rat', x: 4, y: 10 },
       { type: 'monster', tid: 'giant_rat', x: 10, y: 11 },
-      { type: 'monster', tid: 'dire_rat', x: 14, y: 10, name: 'Rat Matriarch' },
+      { type: 'monster', tid: 'dire_rat', x: 14, y: 10, name: 'Brood Mother' },
       { type: 'chest', x: 15, y: 9, loot: { gold: 18, items: ['potion_cure_light', 'dagger'] } },
     ],
   };
@@ -212,14 +213,14 @@ function buildForest() {
     entities: [
       { type: 'transition', x: 24, y: 0, w: 2, to: 'town', tx: 20, ty: 29, label: 'Back to Bramblewick' },
       { type: 'transition', x: 24, y: 43, w: 2, to: 'crypt', tx: 20, ty: 1, label: 'The Sunken Crypt' },
-      { type: 'sign', x: 26, y: 3, label: 'Bramblewick north. Beware: goblins east, wolves west.' },
+      { type: 'sign', x: 26, y: 3, label: 'Bramblewick north. Beware: goblins east, antlions west.' },
       // bandits on the road
       { type: 'monster', tid: 'bandit', x: 19, y: 15 },
       { type: 'monster', tid: 'bandit', x: 22, y: 16 },
       { type: 'monster', tid: 'bandit', x: 21, y: 19, name: 'Bandit Leader' },
       // wolves
       { type: 'monster', tid: 'wolf', x: 8, y: 12 }, { type: 'monster', tid: 'wolf', x: 11, y: 15 }, { type: 'monster', tid: 'wolf', x: 6, y: 16 },
-      { type: 'monster', tid: 'dire_wolf', x: 5, y: 13, name: 'Old Greymane' },
+      { type: 'monster', tid: 'dire_wolf', x: 5, y: 13, name: 'Old Greymandible' },
       { type: 'chest', x: 4, y: 10, loot: { gold: 25, items: ['silver_locket', 'potion_cure_light'] } },
       // shrine
       { type: 'monster', tid: 'giant_spider', x: 38, y: 8 }, { type: 'monster', tid: 'giant_spider', x: 41, y: 9 },
@@ -233,7 +234,7 @@ function buildForest() {
       { type: 'monster', tid: 'goblin_chief', x: 44, y: 28 },
       { type: 'chest', x: 44, y: 24, loot: { gold: 45, items: ['potion_cure_moderate', 'gem_ruby', 'studded_leather_1'] } },
       // ogre cave
-      { type: 'monster', tid: 'ogre', x: 6, y: 38, name: 'Grolm the Ogre' },
+      { type: 'monster', tid: 'ogre', x: 6, y: 38, name: 'Grolm the Minotaur' },
       { type: 'chest', x: 4, y: 36, loot: { gold: 80, items: ['longsword_1', 'potion_cure_serious', 'gem_sapphire'] } },
       // stragglers
       { type: 'monster', tid: 'goblin', x: 28, y: 36 }, { type: 'monster', tid: 'goblin', x: 20, y: 38 },
@@ -258,7 +259,7 @@ function buildCrypt() {
   b.set(5, 6, 'b'); b.set(8, 11, 'b'); b.set(4, 11, 'c'); b.set(4, 12, 'c');
   // west wing south: trap corridor down to the tomb of the knight
   b.rect(6, 13, 2, 9, ':');
-  b.rect(3, 22, 10, 7, ':'); b.set(7, 25, 'A'); b.set(4, 23, 'p'); b.set(11, 23, 'p'); b.set(4, 27, 'p'); b.set(11, 27, 'p');
+  b.rect(3, 22, 10, 7, ':'); b.set(7, 25, 'K'); b.set(4, 23, 'p'); b.set(11, 23, 'p'); b.set(4, 27, 'p'); b.set(11, 27, 'p');
   // east wing: corridor to zombie pit
   b.rect(26, 8, 9, 2, ':');
   b.rect(33, 4, 8, 9, ':'); b.set(36, 6, 'b'); b.set(38, 10, 'b'); b.set(39, 5, 'c');
@@ -316,7 +317,7 @@ function buildCrypt() {
       { type: 'monster', tid: 'cult_acolyte', x: 17, y: 26 }, { type: 'monster', tid: 'cult_acolyte', x: 23, y: 22 },
       { type: 'monster', tid: 'cult_priest', x: 20, y: 25 },
       // prisoner
-      { type: 'npc', id: 'elric', name: 'Elric the Scholar', x: 31, y: 32, dialogue: 'elric', color: '#8a8aa0', shape: 'humanoid' },
+      { type: 'npc', id: 'elric', name: 'Elric the Scholar', x: 31, y: 32, dialogue: 'elric', sprite: 'guild_man', color: '#8a8aa0', shape: 'humanoid' },
       // sanctum door
       { type: 'door', x: 20, y: 33, locked: true, dc: 28, key: 'crypt_key', name: 'Sanctum Door' },
       // sanctum

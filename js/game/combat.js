@@ -3,6 +3,7 @@ import { computeStats, maxHp, distance, isParty, abilityMod, casterInfo, templat
 import { SPELLS, EFFECT_TEMPLATES } from '../data/spells.js';
 import { MONSTERS } from '../data/monsters.js';
 import { ITEMS } from '../data/items.js';
+import { dirFromDelta } from './assets.js';
 
 export const ROUND = 3.0; // seconds per combat round
 
@@ -83,6 +84,7 @@ export function applyDamage(game, target, amount, type, source, opts = {}) {
   }
   target.hp -= dmg;
   game.fx.floatText(target, `-${dmg}`, type === 'fire' ? '#ff8040' : type === 'magic' ? '#a0c0ff' : '#ff4040');
+  if (target.hp > 0 && dmg > 0) game.fx.anim(target, 'hit');
   if (target.kind === 'monster') target.awake = true;
   if (target.hp <= 0) handleDeath(game, target, source);
   else if (source && hostileTo(source, target) && !target.target) {
@@ -103,6 +105,7 @@ export function heal(game, target, amount) {
 
 export function handleDeath(game, c, killer) {
   c.hp = 0;
+  game.fx.anim(c, 'die'); c.moving = false;
   if (c.kind === 'henchman') {
     c.dead = true; c.unconscious = true; c.target = null; c.path = [];
     game.log(`${c.name} falls, badly wounded!`, 'death');
@@ -168,7 +171,9 @@ export function weaponAttack(game, attacker, defender, penalty = 0) {
   const total = r + atkBonus;
   const held = isHeld(defender);
   attacker.facing = defender.x >= attacker.x ? 1 : -1;
-  game.fx.lunge(attacker, defender);
+  attacker.dir = dirFromDelta(defender.x - attacker.x, defender.y - attacker.y);
+  game.fx.anim(attacker, ast.ranged ? 'shoot' : 'swing');
+  if (!ast.ranged) game.fx.lunge(attacker, defender);
   if (ast.ranged) game.fx.projectile(attacker, defender, '#d0c0a0', 'arrow');
   const hit = r !== 1 && (r === 20 || held || total >= dst.ac);
   if (!hit) {
@@ -207,7 +212,7 @@ export function weaponAttack(game, attacker, defender, penalty = 0) {
       game.log(`${defender.name} is paralyzed!`, 'fail');
     }
     if (t.poison && !savingThrow(game, defender, 'fort', t.poison.dc, 'poison')) {
-      addEffect(game, defender, { key: 'poison', STR: t.poison.STR }, t.poison.rounds, 'Spider Venom');
+      addEffect(game, defender, { key: 'poison', STR: t.poison.STR }, t.poison.rounds, 'Fire Ant Venom');
       game.log(`${defender.name} is poisoned!`, 'fail');
     }
   }
@@ -235,6 +240,8 @@ export function castSpell(game, caster, spell, target, entry = null) {
   const area = game.area;
   const tgt = target || caster;
   caster.facing = tgt.x >= caster.x ? 1 : -1;
+  if (tgt !== caster) caster.dir = dirFromDelta(tgt.x - caster.x, tgt.y - caster.y);
+  game.fx.anim(caster, 'cast');
   game.fx.cast(caster, spell.color);
   game.log(`${caster.name} casts ${spell.name}.`, 'spell');
 

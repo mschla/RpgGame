@@ -9,6 +9,7 @@ import { findPath, hasLineOfSight } from '../core/pathfinding.js';
 import { rollDie, rollDice } from '../core/dice.js';
 import * as E from './entity.js';
 import * as C from './combat.js';
+import { dirFromDelta } from './assets.js';
 
 const SAVE_KEY = 'bramblewick_save_';
 
@@ -69,7 +70,7 @@ export class Game {
         area.entities.push(E.createMonster(e.tid, e.x, e.y, e.name));
       } else if (e.type === 'npc') {
         area.entities.push({ uid: this.nextUid(), kind: 'npc', type: 'npc', id: e.id, name: e.name, x: e.x + 0.5, y: e.y + 0.5, faction: 'neutral', dialogue: e.dialogue,
-          color: e.color, shape: e.shape || 'humanoid', size: 1, weaponLook: e.weapon, armorLook: e.armor, effects: [], hp: 20, maxHpBase: 20, henchmanId: e.henchman ? e.id : null, facing: 1, npcTimer: Math.random() * 5 });
+          color: e.color, shape: e.shape || 'humanoid', size: 1, weaponLook: e.weapon, armorLook: e.armor, sprite: e.sprite || null, avatar: e.avatar || null, effects: [], hp: 20, maxHpBase: 20, henchmanId: e.henchman ? e.id : null, facing: 1, dir: 6, npcTimer: Math.random() * 5 });
       } else if (e.type === 'chest') {
         area.entities.push({ uid: this.nextUid(), type: 'chest', name: e.locked ? 'Locked Chest' : 'Chest', x: e.x, y: e.y, loot: { gold: e.loot.gold || 0, items: [...(e.loot.items || [])] }, locked: e.locked || 0, trap: e.trap ? { ...e.trap, found: false, disarmed: false } : null, opened: false });
       } else if (e.type === 'transition') {
@@ -198,9 +199,10 @@ export class Game {
     c.blockedTime = 0;
     const d = Math.hypot(cx - c.x, cy - c.y);
     const step = st.speed * dt;
+    const mx = cx - c.x, my = cy - c.y;
     if (d <= step) { c.x = cx; c.y = cy; c.path.shift(); }
-    else { c.x += (cx - c.x) / d * step; c.y += (cy - c.y) / d * step; }
-    c.facing = cx - c.x > 0.01 ? 1 : cx - c.x < -0.01 ? -1 : c.facing;
+    else { c.x += mx / d * step; c.y += my / d * step; }
+    if (d > 0.01) { c.facing = mx > 0.01 ? 1 : mx < -0.01 ? -1 : c.facing; c.dir = dirFromDelta(mx, my); }
     c.moving = true;
     return true;
   }
@@ -229,7 +231,7 @@ export class Game {
     const inRange = d <= st.range && (st.range <= 2 || this.los(c, t));
     if (inRange) {
       c.path = [];
-      c.facing = t.x >= c.x ? 1 : -1;
+      c.facing = t.x >= c.x ? 1 : -1; c.dir = dirFromDelta(t.x - c.x, t.y - c.y);
       if (this.time >= c.nextAttackAt) {
         const n = st.attacks;
         const idx = c.attackIndex % n;
@@ -479,6 +481,7 @@ export class Game {
     if (n.npcTimer <= 0) {
       n.npcTimer = 3 + Math.random() * 5;
       n.facing = Math.random() < 0.5 ? 1 : -1;
+      if (!this.dialogue || this.dialogue.npc !== n) n.dir = [4, 5, 6, 7, 0][Math.floor(Math.random() * 5)];
     }
   }
 
@@ -528,7 +531,7 @@ export class Game {
     const h = this.henchman;
     if (!h || !h.unconscious) return;
     if (this.area.entities.includes(h) && !this.inCombat()) {
-      h.unconscious = false; h.dead = false; h.hp = Math.max(1, Math.floor(E.maxHp(h) * 0.25)); h.effects = [];
+      h.unconscious = false; h.dead = false; h.hp = Math.max(1, Math.floor(E.maxHp(h) * 0.25)); h.effects = []; h.anim = null;
       this.log(`${h.name} staggers back to his feet.`, 'heal');
     }
   }
@@ -552,7 +555,7 @@ export class Game {
     this.area.entities = this.area.entities.filter(e => e !== h);
     this.henchman = null; this.flags.tomas_hired = false;
     const tavern = this.getArea('tavern');
-    tavern.entities.push({ uid: this.nextUid(), kind: 'npc', type: 'npc', id: 'tomas', name: 'Tomas', x: 12.5, y: 5.5, faction: 'neutral', dialogue: 'tomas', color: '#3a6a3a', shape: 'humanoid', size: 1, weaponLook: 'bow', effects: [], hp: 20, maxHpBase: 20, henchmanId: 'tomas', facing: 1, npcTimer: 1 });
+    tavern.entities.push({ uid: this.nextUid(), kind: 'npc', type: 'npc', id: 'tomas', name: 'Tomas', x: 12.5, y: 5.5, faction: 'neutral', dialogue: 'tomas', color: '#3a6a3a', shape: 'humanoid', size: 1, weaponLook: 'bow', avatar: { gender: 'male', chest: 'leather_chest', legs: 'leather_pants', feet: 'leather_boots', main: 'longbow' }, effects: [], hp: 20, maxHpBase: 20, henchmanId: 'tomas', facing: 1, dir: 6, npcTimer: 1 });
     this.log('Tomas returns to the Rusty Tankard.', 'info');
     this.ui.refreshAll();
   }
@@ -562,7 +565,7 @@ export class Game {
     if (!force && this.time - this.lastVis < 0.15) return;
     this.lastVis = this.time;
     const p = this.player;
-    const R = this.area.outdoor ? 11 : 7;
+    const R = this.area.outdoor ? 11 : 8;
     const vis = new Set();
     const px = Math.floor(p.x), py = Math.floor(p.y);
     for (let y = py - R; y <= py + R; y++) for (let x = px - R; x <= px + R; x++) {
@@ -715,7 +718,7 @@ export class Game {
     if (id === 'silver_locket' && this.questStage('locket') === 1) { this.setQuest('locket', 2); }
     if (id === 'silver_locket' && this.questStage('locket') === 0) { this.log('A tarnished silver locket. Someone in town may be missing it.', 'info'); }
     if (id === 'goblin_chief_head' && this.questStage('goblins') === 1) this.setQuest('goblins', 2);
-    if (id === 'rat_tail' && this.questStage('rats') === 1 && E.countItem(this.player, 'rat_tail') >= 5) this.setQuest('rats', 2);
+    if (id === 'antling_mandible' && this.questStage('rats') === 1 && E.countItem(this.player, 'antling_mandible') >= 5) this.setQuest('rats', 2);
   }
 
   // ------------------------------------------------------------ area transitions
@@ -750,7 +753,7 @@ export class Game {
     this.ui.fade(() => {
       for (const c of [this.player, this.henchman]) {
         if (!c) continue;
-        c.unconscious = false; c.dead = false; c.effects = []; c.tempHp = 0;
+        c.unconscious = false; c.dead = false; c.effects = []; c.tempHp = 0; c.anim = null;
         c.hp = E.maxHp(c); E.restoreSlots(c); c.rageUses = E.rageUsesMax(c); c.turnUses = E.turnUsesMax(c);
       }
       this.clock += 8 * 3600;
@@ -825,7 +828,7 @@ export class Game {
       level: () => p.level,
       log: (m) => g.log(m, 'info'),
       needsHealing: () => p.hp < E.maxHp(p) || (g.henchman && g.henchman.hp < E.maxHp(g.henchman)),
-      healParty: () => { for (const c of [p, g.henchman]) if (c) { c.hp = E.maxHp(c); c.unconscious = false; c.dead = false; c.effects = c.effects.filter(e => !e.harmful); } g.fx.burst(p, '#ffe680', 1); g.log('Your wounds are healed.', 'heal'); },
+      healParty: () => { for (const c of [p, g.henchman]) if (c) { c.hp = E.maxHp(c); c.unconscious = false; c.dead = false; c.anim = null; c.effects = c.effects.filter(e => !e.harmful); } g.fx.burst(p, '#ffe680', 1); g.log('Your wounds are healed.', 'heal'); },
       openShop: (title, ids, mult) => g.ui.showShop(title, ids, mult),
       hireHenchman: (id) => g.hireHenchman(id),
       dismissHenchman: () => g.dismissHenchman(),
@@ -848,8 +851,8 @@ export class Game {
     if (npc.kind === 'henchman') { this.ui.showHenchmanMenu(npc); return; }
     const d = DIALOGUES[npc.dialogue];
     if (!d) { this.log(`${npc.name} has nothing to say.`, 'info'); return; }
-    npc.facing = this.player.x >= npc.x ? 1 : -1;
-    this.player.facing = npc.x >= this.player.x ? 1 : -1;
+    npc.facing = this.player.x >= npc.x ? 1 : -1; npc.dir = dirFromDelta(this.player.x - npc.x, this.player.y - npc.y);
+    this.player.facing = npc.x >= this.player.x ? 1 : -1; this.player.dir = dirFromDelta(npc.x - this.player.x, npc.y - this.player.y);
     const api = this.dialogueApi();
     const start = typeof d.start === 'function' ? d.start(api) : d.start;
     this.dialogue = { npc, def: d, node: start };
@@ -958,7 +961,7 @@ export class Game {
       areas, log: this.logLines.slice(-40),
     };
     try {
-      localStorage.setItem(SAVE_KEY + slot, JSON.stringify(data));
+      localStorage.setItem(SAVE_KEY + slot, JSON.stringify(data, (k, v) => (k === '_bounds' || k === 'anim' || k === 'lunge') ? undefined : v));
       this.log('Game saved.', 'info');
       return true;
     } catch (err) { this.log('Save failed: ' + err.message, 'fail'); return false; }

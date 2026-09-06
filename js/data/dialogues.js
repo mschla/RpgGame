@@ -191,7 +191,7 @@ export const DIALOGUES = {
         options: [{ text: 'Show me anyway.', action: (g) => g.openShop("Ysolde's Private Stock", SHOP_YSOLDE_MAGIC, 1.0), next: null }],
       },
       news: {
-        text: "\"Goblins on the south road, so no caravans, so my shelves are thin. Bram's got rats. Mara's still waiting for a boy who isn't coming home. And someone robbed the temple. Cheerful place, Bramblewick.\"",
+        text: "\"Goblins on the south road, so no caravans, so my shelves are thin. Bram's got bugs in his cellar. Mara's still waiting for a boy who isn't coming home. And someone robbed the temple. Cheerful place, Bramblewick.\"",
         options: [{ text: "Let's see your wares.", action: (g) => g.openShop("Ysolde's Goods", SHOP_YSOLDE, 1.0), next: null }, { text: 'Thanks.', next: null }],
       },
     },
@@ -214,7 +214,7 @@ export const DIALOGUES = {
         ],
       },
       tam: {
-        text: "\"He went hunting west of the road, near the old wolf den. That was in spring. The guards found his bow but not him, and not the locket he wore. It had my husband's picture in it.\" She grips your arm. \"If you find it, bring it to me. Please. I have thirty gold saved.\"",
+        text: "\"He went hunting west of the road, near the old antlion nest. That was in spring. The guards found his bow but not him, and not the locket he wore. It had my husband's picture in it.\" She grips your arm. \"If you find it, bring it to me. Please. I have thirty gold saved.\"",
         options: [
           { text: "I'll look for it. Keep your gold.", action: (g) => { g.setQuest('locket', 1); g.setFlag('locket_noble', true); }, next: 'thanks' },
           { text: "I'll look for it.", action: (g) => g.setQuest('locket', 1), next: 'thanks' },
@@ -222,11 +222,11 @@ export const DIALOGUES = {
         ],
       },
       thanks: {
-        text: "\"Thank you. Thank you. Be careful of the wolves.\"",
+        text: "\"Thank you. Thank you. Be careful of the antlions.\"",
         options: [{ text: 'I will.', next: null }],
       },
       active: {
-        text: "\"Any sign of the locket? It was near the wolf den, west of the road.\"",
+        text: "\"Any sign of the locket? It was near the antlion nest, west of the road.\"",
         options: [{ text: 'Not yet.', next: null }],
       },
       found: {
@@ -251,7 +251,7 @@ export const DIALOGUES = {
   bram: {
     start: (g) => {
       if (g.questStage('rats') >= 3) return 'after';
-      if (g.questStage('rats') >= 1 && g.countItem('rat_tail') >= 5) return 'tails';
+      if (g.questStage('rats') >= 1 && g.countItem('antling_mandible') >= 5) return 'tails';
       if (g.questStage('rats') === 1) return 'active';
       return 'intro';
     },
@@ -266,10 +266,10 @@ export const DIALOGUES = {
         ],
       },
       rats: {
-        text: "\"Rats. Big ones. In the cellar, chewing through my stock. My last cellar boy came up screaming about a rat the size of a dog. Clear them out and bring me five tails as proof and I'll pay fifty gold. Stairs are in the back corner.\"",
+        text: "\"Antlings. Burrowing insects the size of dogs, chewing through my stock. My last cellar boy came up screaming about one with mandibles like scythes. Clear them out and bring me five mandibles as proof and I'll pay fifty gold. Stairs are in the back corner.\"",
         options: [
           { text: "Consider it done.", action: (g) => g.setQuest('rats', 1), next: 'accept' },
-          { text: "I don't do rats.", next: null },
+          { text: "I don't do bugs.", next: null },
         ],
       },
       accept: {
@@ -277,12 +277,12 @@ export const DIALOGUES = {
         options: [{ text: 'Right.', next: null }],
       },
       active: {
-        text: "\"Five tails, friend, and fifty gold is yours. The cellar stairs are in the corner.\"",
+        text: "\"Five mandibles, friend, and fifty gold is yours. The cellar stairs are in the corner.\"",
         options: [{ text: 'Working on it.', next: null }],
       },
       tails: {
-        text: "Bram grimaces at the handful of tails, then laughs. \"Ha! That's them. And the big one too, I hope. Here's your fifty, and a drink on the house.\"",
-        options: [{ text: 'Pleasure doing business.', action: (g) => { g.removeItem('rat_tail', 5); g.addGold(50); g.completeQuest('rats'); }, next: null }],
+        text: "Bram grimaces at the handful of mandibles, then laughs. \"Ha! That's them. And the big one too, I hope. Here's your fifty, and a drink on the house.\"",
+        options: [{ text: 'Pleasure doing business.', action: (g) => { g.removeItem('antling_mandible', 5); g.addGold(50); g.completeQuest('rats'); }, next: null }],
       },
       after: {
         text: "\"My cellar's quiet at last. Ale's on the house for you, always.\"",
@@ -296,7 +296,7 @@ export const DIALOGUES = {
         options: [{ text: 'Interesting.', next: null }],
       },
       rumors: {
-        text: "\"Old Greymane's back in the western woods, a dire wolf the size of a pony. And an ogre's moved into the cave past the river. Then there's the crypt in the south hills. Folk say lights have been seen there at night. Nobody goes near it.\"",
+        text: "\"Old Greymandible's back in the western woods, an antlion the size of a pony. And a minotaur's moved into the cave past the river. Then there's the crypt in the south hills. Folk say lights have been seen there at night. Nobody goes near it.\"",
         options: [{ text: 'Thanks for the warning.', next: null }],
       },
     },
@@ -399,13 +399,13 @@ export const DIALOGUES = {
   fisherman: {
     start: () => 'intro',
     nodes: {
-      intro: { text: "\"Nothing bites anymore. Fish know something we don't.\" He squints at the water. \"There's a crossing over the forest river, west of the road, if you're looking for the ogre's cave. Don't know why you would be.\"", options: [{ text: 'Thanks for the tip.', next: null }] },
+      intro: { text: "\"Nothing bites anymore. Fish know something we don't.\" He squints at the water. \"There's a crossing over the forest river, west of the road, if you're looking for the minotaur's cave. Don't know why you would be.\"", options: [{ text: 'Thanks for the tip.', next: null }] },
     },
   },
   drunk: {
     start: () => 'intro',
     nodes: {
-      intro: { text: "\"Th' rats... they've got a queen down there. Big as a hound. Saw her eyes.\" He slumps back onto the table.", options: [{ text: 'Sleep it off.', next: null }] },
+      intro: { text: "\"Th' bugs... they've got a queen down there. Big as a hound. Saw her mandibles.\" He slumps back onto the table.", options: [{ text: 'Sleep it off.', next: null }] },
     },
   },
 };

@@ -21,7 +21,7 @@ export function createPlayer({ name, race, cls, abilities, skills, color, gender
     equipment: { weapon: null, armor: null, shield: null, ring: null, amulet: null, cloak: null, boots: null },
     inventory: [], gold: 0, effects: [], hp: 1, tempHp: 0, hpRolls: [],
     spellSlots: {}, rageUses: 0, turnUses: 0, color: color || '#c04040', shape: 'humanoid', size: 1,
-    target: null, path: [], nextAttackAt: 0, attackIndex: 0, dead: false, facing: 1,
+    target: null, path: [], nextAttackAt: 0, attackIndex: 0, dead: false, facing: 1, dir: 6,
   };
   const cd = CLASSES[cls];
   c.hpRolls = [cd.hitDie];
@@ -63,7 +63,7 @@ export function createMonster(tid, x, y, nameOverride) {
     creatureType: t.creatureType, level: Math.max(1, parseInt(t.hp, 10) || 1),
     hp: 0, maxHpBase: Math.max(1, rollDice(t.hp)), tempHp: 0, effects: [], target: null, path: [], nextAttackAt: 0, attackIndex: 0, dead: false,
     homeX: x + 0.5, homeY: y + 0.5, spells: (t.spells || []).map(s => ({ ...s, left: s.uses })), summonsLeft: t.summons ? 1 : 0,
-    color: t.color, shape: t.shape, size: t.size || 1, weaponLook: t.weapon, facing: 1, aiTimer: Math.random(), boss: !!t.boss, awake: false,
+    color: t.color, shape: t.shape, size: t.size || 1, weaponLook: t.weapon, facing: 1, dir: 4 + Math.floor(Math.random() * 4), aiTimer: Math.random(), boss: !!t.boss, awake: false,
   };
   c.hp = c.maxHpBase;
   return c;

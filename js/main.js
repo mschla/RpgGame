@@ -1,11 +1,13 @@
 import { Game } from './game/game.js';
 import { Renderer } from './game/renderer.js';
 import { UI, CharacterCreator } from './game/ui.js';
+import { Assets } from './game/assets.js';
 
 const $ = (id) => document.getElementById(id);
 
 const canvas = $('game');
-const renderer = new Renderer(canvas, $('minimap'));
+const assets = new Assets('assets/');
+const renderer = new Renderer(canvas, $('minimap'), assets);
 const ui = new UI();
 const game = new Game(ui, renderer);
 ui.game = game; renderer.game = game;
@@ -108,3 +110,11 @@ function frame(now) {
 }
 showScreen('menu');
 requestAnimationFrame(frame);
+
+// ---------------------------------------------------------------- art
+const loadingEl = $('loading');
+$('btn-new').disabled = true; $('btn-load').disabled = true;
+assets.load((f) => { loadingEl.textContent = `Loading art… ${Math.round(f * 100)}%`; }).then((ok) => {
+  loadingEl.textContent = ok ? '' : 'Art assets not found; using simple graphics.';
+  $('btn-new').disabled = false; refreshSaveInfo();
+});

@@ -2,7 +2,7 @@
 
 A browser-based role-playing game in the spirit of *Neverwinter Nights*: an isometric world, d20 combat rules, character creation with races and classes, real-time-with-pause fighting, spells, dialogue trees with skill checks, a quest journal, a henchman, loot, traps, locks, and save games.
 
-No build step and no dependencies. It is plain HTML, CSS and ES modules drawn on a canvas.
+No build step and no runtime dependencies. It is plain HTML, CSS and ES modules drawn on a canvas. The art comes from the open-source game [Flare](https://github.com/flareteam/flare-game) (see *Art* below).
 
 ## Running it
 
@@ -16,9 +16,9 @@ Then open <http://localhost:8000/>. It also works when published on GitHub Pages
 
 ## The game
 
-You arrive in the town of Bramblewick. Goblins raid the south road, rats infest the tavern cellar, a widow's son never came home from the woods, and someone has stolen the Amulet of Dawn from the temple. The trail leads through the Whispering Woods to the Sunken Crypt, where the Pale Hand cult and the necromancer Malachar wait.
+You arrive in the town of Bramblewick. Goblins raid the south road, antlings infest the tavern cellar, a widow's son never came home from the woods, and someone has stolen the Amulet of Dawn from the temple. The trail leads through the Whispering Woods to the Sunken Crypt, where the Pale Hand cult and the necromancer Malachar wait.
 
-Five areas: Bramblewick, the Rusty Tankard tavern, its cellar, the Whispering Woods and the Sunken Crypt. Five quests, a hireable ranger companion, shops, a temple healer, a locked sanctum, trapped corridors and a final boss who raises the dead.
+Five areas: Bramblewick, the Rusty Tankard tavern, its cellar, the Whispering Woods and the Sunken Crypt. Five quests, a hireable ranger companion, shops, a temple healer, a locked sanctum, trapped corridors, antlions and fire ants in the woods, a minotaur in a cave, and a final boss who raises the dead.
 
 ### Character creation
 
@@ -51,6 +51,16 @@ Five areas: Bramblewick, the Rusty Tankard tavern, its cellar, the Whispering Wo
 | F5 / F9 | Save / load (browser localStorage) |
 | Esc | Close panels, cancel targeting, pause |
 
+## Art
+
+Tiles, props and animated creature sprites are taken from Flare's fantasycore assets (CC-BY-SA 3.0, credits in `assets/CREDITS-flare.txt`, license in `assets/LICENSE-flare-art.txt`). They were rendered at half of Flare's 192x96 resolution, so the game grid is 96x48. Human characters, enemies and NPCs alike, are drawn from Flare's layered avatar sheets, so the hero's armor, weapon and shield show on the sprite. If the `assets/` folder is missing the game falls back to simple procedural graphics.
+
+To regenerate the assets from a flare-game checkout (needs Node and the `playwright` package, whose bundled Chromium does the image scaling):
+
+```
+node tools/build-assets.mjs /path/to/flare-game
+```
+
 ## Code layout
 
 ```
@@ -63,7 +73,10 @@ js/data/              races, classes, skills, items, spells, monsters, areas, di
 js/game/entity.js     creature creation, inventory, derived stats, spell slots, level-up
 js/game/combat.js     attacks, damage, saves, spells, effects, special abilities, loot
 js/game/game.js       world state, AI, player actions, interactions, dialogue API, save/load
-js/game/renderer.js   isometric canvas renderer, sprites, fog of war, effects, minimap
+js/game/renderer.js   isometric canvas renderer, tile atlas, sprite animation, fog of war, effects, minimap
+js/game/assets.js     art loader, direction and animation helpers
+js/game/avatar.js     equipment to avatar sprite layer mapping
+tools/build-assets.mjs builds assets/ from a flare-game checkout
 js/game/ui.js         HUD, quickbar, panels, dialogue, shop, loot, level-up, character creation
 ```
 

@@ -423,9 +423,10 @@ export class UI {
 export class CharacterCreator {
   constructor(onStart, onBack) {
     this.onStart = onStart; this.onBack = onBack;
-    this.race = 'human'; this.cls = 'fighter';
+    this.race = 'human'; this.cls = 'fighter'; this.gender = 'm';
     this.abilities = { STR: 8, DEX: 8, CON: 8, INT: 8, WIS: 8, CHA: 8 };
     this.skills = {};
+    for (const c of document.querySelectorAll('#cc-gender .card')) c.onclick = () => { this.gender = c.dataset.g; for (const d of document.querySelectorAll('#cc-gender .card')) d.classList.toggle('selected', d === c); };
     $('cc-back').onclick = () => onBack();
     $('cc-start').onclick = () => this.start();
     $('cc-name').oninput = () => this.renderSummary();
@@ -484,6 +485,6 @@ export class CharacterCreator {
   }
   start() {
     const name = $('cc-name').value.trim() || 'Hero';
-    this.onStart({ name, race: this.race, cls: this.cls, abilities: { ...this.abilities }, skills: { ...this.skills }, color: $('cc-color').value });
+    this.onStart({ name, race: this.race, cls: this.cls, abilities: { ...this.abilities }, skills: { ...this.skills }, color: $('cc-color').value, gender: this.gender });
   }
 }
