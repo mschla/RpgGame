@@ -68,10 +68,12 @@ function wallPieceRole(sig) {
     case 3: return F(sw) ? 'corner_ne' : W(sw) ? 'block_ne' : 'tip_ne';   // S+W
     case 12: return F(ne) ? 'corner_sw' : W(ne) ? 'block_sw' : 'tip_sw';  // N+E
     case 9: return F(nw) ? 'corner_se' : 'tip_se';                        // N+W
+    // T-junctions; a stub meeting the wall from the room's side keeps the straight low stub rather than a tall
+    // corner (Flare: WVVVWFWF -> 82, WFWVVVWF -> 83)
     case 7: return openN ? 'back_x' : F(sw) ? 'corner_ne' : F(se) ? 'corner_nw' : 'back_x';   // E+S+W
     case 14: return openW ? 'back_y' : F(se) ? 'corner_nw' : F(ne) ? 'corner_sw' : 'back_y';  // N+E+S
-    case 11: return openE ? 'se' : F(sw) ? 'corner_ne' : F(nw) ? 'corner_se' : 'back_y';      // N+S+W
-    case 13: return openS ? 'sw' : F(ne) ? 'corner_sw' : F(nw) ? 'corner_se' : 'back_x';      // N+E+W
+    case 11: return openE ? 'se' : F(nw) && F(sw) ? 'nw_low' : F(sw) ? 'corner_ne' : F(nw) ? 'corner_se' : 'back_y';  // N+S+W
+    case 13: return openS ? 'sw' : F(ne) && F(nw) ? 'ne_low' : F(ne) ? 'corner_sw' : F(nw) ? 'corner_se' : 'back_x';  // N+E+W
     case 15: return F(nw) ? 'back_corner' : F(se) ? 'corner_nw' : F(sw) ? 'back_x' : 'back_y';
     case 8: return 'end_n'; case 4: return 'end_e'; case 2: return 'end_s'; case 1: return 'end_w';
     default: return 'lone';
@@ -195,8 +197,12 @@ export class Renderer {
       const bld = houses && (ch === '#' || ch === 'd') ? this.buildingAt(x, y) : null;
       if (bld) { if (bld.explored) items.push({ d: x + y, x, y, tile: t, ch, bld }); continue; }
       if (!g.isExplored(x, y)) continue;
-      if (t.height && this.useArt && this.wallSet(x, y) !== 'block' && !this.wallRole(x, y)) continue; // solid interior: nothing to draw
-      if (t.height || t.tree || t.bush || t.pillar || t.grave || t.altar || t.crate || t.table || t.well || t.stump || (this.useArt && (t.stairs || t.bones || ch === '.' && hash(x, y, 9) % 14 === 0))) items.push({ d: x + y, x, y, tile: t, ch });
+      if (t.height && this.useArt && this.wallSet(x, y) !== 'block') { // dungeon / cave piece, looked up once per frame; the solid interior has none
+        const wall = this.wallTile(x, y);
+        if (wall) items.push({ d: x + y, x, y, tile: t, ch, wall });
+        continue;
+      }
+      if (t.height || t.tree || t.bush || t.pillar || t.grave || t.altar || t.crate || t.table || t.well || t.stump || (this.useArt && (t.door && !a.outdoor || t.stairs || t.bones || ch === '.' && hash(x, y, 9) % 14 === 0))) items.push({ d: x + y, x, y, tile: t, ch });
     }
     for (const e of a.entities) {
       const isCreature = e.hp !== undefined;
@@ -222,12 +228,14 @@ export class Renderer {
           const dd = it.x + it.y + 1 - pd, dx = it.x - it.y - (pl.x - pl.y);
           inFront = dd > 0.5 && dd < 5.5 && Math.abs(dx) < 1.45;
         } else {
-          const tall = it.tile.tree || it.tile.height && this.wallIsTall(it.x, it.y);
-          inFront = tall && it.x + it.y > pd + 0.5 && Math.abs(it.x - pl.x) < 4 && Math.abs(it.y - pl.y) < 4;
+          // trees, door art, tall wall pieces and the outdoor brick blocks can hide the player; a door stands in a
+          // one-tile wall, so it also covers the player right behind it (the tile at the same depth)
+          const tall = it.tile.tree || it.tile.door || it.tile.height && (!it.wall || this.tallPiece(it.wall));
+          inFront = tall && it.x + it.y > pd + (it.tile.door ? -0.5 : 0.5) && Math.abs(it.x - pl.x) < 4 && Math.abs(it.y - pl.y) < 4;
         }
         const alpha = dimFor(vis) * (inFront ? 0.4 : 1);
         if (it.bld) this.drawBuilding(it.x, it.y, it.ch, it.bld, alpha);
-        else this.drawObject(it.x, it.y, it.tile, it.ch, alpha);
+        else this.drawObject(it.x, it.y, it.tile, it.ch, alpha, it.wall);
       } else if (it.ent.hp !== undefined) this.drawCreature(it.ent, dt, animDt);
       else this.drawEntityObject(it.ent, g.isVisible(it.ent.x, it.ent.y) ? 1 : (a.outdoor ? 0.75 : 0.55));
     }
@@ -274,7 +282,7 @@ export class Renderer {
       if (f.tile) {
         if (f.merged) this.blitCanvas(f.merged, cx, cy, dim);
         else { this.blit(f.tile, cx, cy, dim); if (f.ov) this.blitCanvas(f.ov, cx, cy, dim); }
-        if (ch === 'd' && !this.buildingAt(x, y)) this.drawDoorway(cx, cy, dim);
+        if (ch === 'd' && this.game.area.outdoor && !this.buildingAt(x, y)) this.drawDoorway(cx, cy, dim); // indoor doors: see drawDoor
         return;
       }
     }
@@ -437,9 +445,10 @@ export class Renderer {
     for (const [dx, dy] of N8) if (!this.isWall(x + dx, y + dy) && !this.isDoor(x + dx, y + dy)) return 'W';
     return 'V';
   }
-  /** Piece role of a dungeon / cave wall tile (null for the solid interior), cached per area. */
+  /** Piece role of a dungeon / cave wall tile (null for floor, doors, the solid interior and off the map), cached per area. */
   wallRole(x, y) {
     const a = this.game.area;
+    if (x < 0 || y < 0 || x >= a.width || y >= a.height || !this.isWall(x, y)) return null;
     if (this.wallCache.area !== a) this.wallCache = { area: a, roles: new Map() };
     const k = y * a.width + x;
     let role = this.wallCache.roles.get(k);
@@ -447,10 +456,26 @@ export class Renderer {
     role = null;
     if (this.wallClass(x, y) === 'W') {
       role = wallPieceRole(N8.map(([dx, dy]) => this.wallClass(x + dx, y + dy)).join(''));
+      // dungeon only: the back row of the wall between two rooms one tile apart (floor straight behind it, wall in
+      // front) is the low rubble Flare also uses there instead of the tall black 67/66, which would hide the far
+      // room's floor along the wall; the cave set has no low pieces and keeps Flare's black rock
+      if (this.wallSet(x, y) === '') {
+        if (role === 'back_x' && this.wallClass(x, y - 1) === 'F') role = 'thin_x';
+        if (role === 'back_y' && this.wallClass(x - 1, y) === 'F') role = 'thin_y';
+      }
       // jambs keep the tall lit face of the door art instead of the low rubble a thin wall gets
       if (role === 'thin_x' && (this.isDoor(x - 1, y) || this.isDoor(x + 1, y))) role = 'sw';
       if (role === 'thin_y' && (this.isDoor(x, y - 1) || this.isDoor(x, y + 1))) role = 'se';
+      // a stub row ends at a doorway with the low tip, the way Flare caps a gap, instead of the stub's bare black end
+      if (role === 'ne_low' && this.isDoor(x + 1, y)) role = 'tip_ne';
+      if (role === 'nw_low' && this.isDoor(x, y + 1)) role = 'tip_sw';
+      // a tall corner only caps a tall wall (or a door): after ends, rubble or stubs its low twin ends the run
+      if (role === 'corner_ne' && !this.isDoor(x - 1, y) && !this.tallPiece(this.wallTile(x - 1, y))) role = 'tip_ne';
+      if (role === 'corner_sw' && !this.isDoor(x, y - 1) && !this.tallPiece(this.wallTile(x, y - 1))) role = 'tip_sw';
+      // the cap stub paints the lit face of the tall corner before it (Flare: 70 only after 78, 71 only after 76), and
       // the low black continuation only follows a low corner (Flare never puts it after a tall piece)
+      if (role === 'nw_low_cap' && this.wallRole(x, y - 1) !== 'corner_ne') role = 'nw_low';
+      if (role === 'ne_low_cap' && this.wallRole(x - 1, y) !== 'corner_sw') role = 'ne_low';
       if (role === 'sw_low' && this.wallRole(x - 1, y) !== 'tip_sw') role = 'sw';
       if (role === 'se_low' && this.wallRole(x, y - 1) !== 'tip_ne') role = 'se';
     }
@@ -458,11 +483,12 @@ export class Renderer {
     return role;
   }
   wallTile(x, y) { const role = this.wallRole(x, y); return role ? this.assets.tile(this.wallSet(x, y) + 'wall_' + role, hash(x, y, 5)) : null; }
-  /** Only tall pieces can hide the player, so only they turn translucent in front of the player. */
-  wallIsTall(x, y) { if (!this.useArt || this.wallSet(x, y) === 'block') return true; const t = this.wallTile(x, y); return !!t && t.oy > 100; }
+  /** Only tall pieces can hide the player (so only they turn translucent in front of it) or carry a tall corner. */
+  tallPiece(tile) { return !!tile && tile.oy > 100; }
 
-  /** Dungeon slabs and cave rock: the piece Flare would place for this tile's neighbourhood (see wallPieceRole). */
-  drawWall(x, y, cx, cy, dim) {
+  /** Dungeon slabs and cave rock: the piece Flare would place for this tile's neighbourhood (see wallPieceRole),
+   *  looked up once per frame by draw(). */
+  drawWall(x, y, cx, cy, dim, tile) {
     const set = this.wallSet(x, y);
     if (set === 'block') {
       // Blender-rendered log walls and palisades when present (tools/blender/render_iso.py), Flare brick otherwise
@@ -471,8 +497,14 @@ export class Renderer {
       if (custom) { this.blit(custom, cx, cy, dim); return; }
       const t = this.assets.tile('wall_block', 0); if (t) this.blitBottom(t, cx, cy, dim); return;
     }
-    const tile = this.wallTile(x, y);
+    if (tile === undefined) tile = this.wallTile(x, y);
     if (tile) this.blit(tile, cx, cy, dim);
+  }
+  /** Indoor 'd' tiles: Flare's door art at the door's own depth, so the neighbouring pieces cannot cover it
+   *  (door_b faces the room across a wall along x, door_a across one along y). */
+  drawDoor(x, y, cx, cy, dim) {
+    const tile = this.assets.tile(this.isWall(x - 1, y) && this.isWall(x + 1, y) ? 'door_b' : 'door_a', 0);
+    if (tile) this.blit(tile, cx, cy, dim); else this.drawDoorway(cx, cy, dim);
   }
   /** Part of a 2x2 block of wall tiles: a building rather than a fence line. */
   isThick(x, y) {
@@ -541,12 +573,13 @@ export class Renderer {
     ctx.drawImage(this.assets.atlas, fx, fy, tile.w, tile.h, cx - tile.w / 2, cy + TH / 2 - tile.h, tile.w, tile.h);
     if (alpha !== 1) ctx.globalAlpha = 1;
   }
-  drawObject(x, y, t, ch, dim) {
+  drawObject(x, y, t, ch, dim, wall) {
     const ctx = this.ctx;
     const [cx, cy] = this.toScreen(x + 0.5, y + 0.5);
     if (this.useArt) {
       const seed = hash(x, y, 7);
-      if (t.height) { this.drawWall(x, y, cx, cy, dim); return; }
+      if (t.height) { this.drawWall(x, y, cx, cy, dim, wall); return; }
+      if (t.door) { this.drawDoor(x, y, cx, cy, dim); return; }
       let name = null;
       if (t.tree) { const r = seed % 10; name = r < 6 ? 'tree' : r < 9 ? 'tree_pine' : 'tree_pale'; }
       else if (t.bush) name = 'bush';
