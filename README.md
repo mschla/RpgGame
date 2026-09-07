@@ -57,6 +57,8 @@ Tiles, props and animated creature sprites are taken from Flare's fantasycore as
 
 Spell, item, ability and class icons are from [game-icons.net](https://game-icons.net) (CC BY 3.0, attribution in `assets/CREDITS-game-icons.txt`). The assignments live in `js/data/icons.js`; `node tools/build-icons.mjs /path/to/game-icons` extracts the SVGs from a checkout of the game-icons/icons repository.
 
+Flare has no transition tiles between its ground types, so the renderer softens floor boundaries itself: where grass meets a road, mud, paving or water, the higher material spills over the lower one's edge through a noisy alpha mask (rendered once per cell into a small canvas), and floor variants are picked with low-frequency noise over the variants sorted by brightness, with cobbles, stones and cracked slabs sprinkled in sparsely.
+
 To regenerate the Flare assets from a flare-game checkout (needs Node and the `playwright` package, whose bundled Chromium does the image scaling):
 
 ```

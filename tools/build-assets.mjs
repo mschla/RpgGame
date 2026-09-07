@@ -51,19 +51,22 @@ for (const g of ['male', 'female']) {
 
 const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
 const TILES = {
-  floor_stone: ['dungeon', [16, 17, 18, 19, ...range(36, 47)]], floor_tile: ['dungeon', range(32, 35)], wall_block: ['dungeon', [48]],
+  // plain slabs for most cells; the cracked / mossy slabs are sprinkled in by the renderer
+  floor_stone: ['dungeon', [16, 17, 18, 19, 36, 37, 38, 43]], floor_stone_detail: ['dungeon', [39, 40, 41, 42, 44, 45, 46, 47]],
+  floor_tile: ['dungeon', range(32, 35)], wall_block: ['dungeon', [48]],
   floor_rug: ['dungeon', [61]],
   statue: ['dungeon', range(128, 131)], throne: ['dungeon', [132, 133]], altar: ['dungeon', [134, 135]], table: ['dungeon', [136, 137]],
   crate: ['dungeon', [146, 147, 160, 161, 162, 163]], lectern: ['dungeon', [148, 149]], brazier: ['dungeon', [167]],
   bones: ['dungeon', range(176, 183)], sarcophagus: ['dungeon', [199, 194]], bed: ['dungeon', [203]],
   door_a: ['dungeon', [208]], door_b: ['dungeon', [209]], stairs: ['dungeon', [284, 285]], floor_decal: ['dungeon', [264]],
   floor_grass: ['grassland', range(16, 31)], floor_grass_alt: ['grassland', range(32, 47)],
-  floor_dirt: ['cave', range(16, 23)], floor_mud: ['cave', range(24, 31)], floor_planks: ['cave', range(32, 35)],
+  floor_dirt: ['cave', range(16, 23)], floor_dirt_detail: ['cave', range(48, 51)], floor_mud: ['cave', range(24, 31)], floor_planks: ['cave', range(32, 35)],
   chest_closed: ['grassland', [297]], chest_open: ['grassland', [298]], sign: ['grassland', [138]],
   tree: ['grassland', [252, 253, 254, 255]], tree_pine: ['grassland', range(248, 251)], tree_pale: ['grassland', [242, 243]], tree_dead: ['grassland', range(244, 247)],
   bush: ['grassland', range(112, 117)], tuft: ['grassland', range(120, 127)], rock: ['grassland', range(128, 131)], spire: ['grassland', range(132, 135)],
   stump: ['grassland', [136, 137]], grave: ['grassland', [140, 141]], cross: ['grassland', [142, 143]], fence: ['grassland', range(104, 111)], campfire: ['grassland', [102]], logs: ['grassland', [100, 101]],
-  water: ['water', range(180, 190)],
+  // Flare draws its water one tile below the cliff tops (oy=-48); our rivers lie level with the ground
+  water: ['water', range(176, 191), { oy: 48 }],
 };
 // Wall pieces by role, [dungeon ids, cave ids], the way Flare's own maps use them (see wallPieceRole in
 // js/game/renderer.js). The two visible faces of a block are SE (+x) and SW (+y): a wall gets a tall piece with a lit
@@ -182,13 +185,14 @@ const defs = {
   cave: parseTileset(path.join(MODS, FC, 'tilesetdefs/tileset_cave.txt')),
 };
 const entries = [];
-for (const [name, [set, ids]] of Object.entries(TILES)) {
+for (const [name, [set, ids, opt = {}]] of Object.entries(TILES)) {
   const section = set === 'water' ? 2 : 1;
   for (const id of ids) {
     const t = defs[set][`${section}:${id}`];
     if (!t) { console.warn('missing tile', set, id); continue; }
     const frames = t.frames && t.frames.length > 1 ? t.frames : [[t.x, t.y, 0]];
-    entries.push({ name, id, img: 'file://' + path.join(MODS, FC, t.img), w: r(t.w * SCALE), h: r(t.h * SCALE), ox: r(t.ox * SCALE), oy: r(t.oy * SCALE), sw: t.w, sh: t.h,
+    const ox = opt.ox ?? t.ox, oy = opt.oy ?? t.oy;
+    entries.push({ name, id, img: 'file://' + path.join(MODS, FC, t.img), w: r(t.w * SCALE), h: r(t.h * SCALE), ox: r(ox * SCALE), oy: r(oy * SCALE), sw: t.w, sh: t.h,
       frames: frames.map(([x, y, d]) => ({ sx: x, sy: y, dur: d })) });
   }
 }

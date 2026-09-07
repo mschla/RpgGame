@@ -21,6 +21,24 @@ function shade(hex, f) {
   return v;
 }
 function hash(x, y, salt = 0) { let h = (x * 374761393 + y * 668265263 + salt * 982451653) | 0; h = (h ^ (h >>> 13)) * 1274126177; return Math.abs(h ^ (h >>> 16)); }
+/** Integer hash to [0, 1). */
+function nhash(x, y, s = 0) { let h = Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(s | 0, 982451653); h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; }
+/** Smooth value noise in [0, 1]; continuous over the whole map, so masks meet seamlessly across cell borders. */
+function vnoise(x, y, s = 0) {
+  const xi = Math.floor(x), yi = Math.floor(y); let fx = x - xi, fy = y - yi;
+  fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
+  const a = nhash(xi, yi, s), b = nhash(xi + 1, yi, s), c = nhash(xi, yi + 1, s), d = nhash(xi + 1, yi + 1, s);
+  return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
+}
+const sstep = (t) => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
+
+// Floor blending. Where two natural materials meet, the higher-ranked one spills over the lower one's edge through
+// a ragged soft mask (grass over dirt, dirt over mud, everything over water). Built surfaces (planks, rugs) and
+// walls / doors are not ranked and keep hard edges.
+const BLEND_RANK = { floor_grass: 5, floor_dirt: 4, floor_mud: 3, floor_stone: 2, water: 0 };
+const SPILL_NAME = ['water', null, 'floor_stone', 'floor_mud', 'floor_dirt', 'floor_grass'];
+// Sparse detail variants (cobbles in grass, stones on a road, cracked slabs): [tile set, share of cells]
+const FLOOR_DETAIL = { floor_grass: ['floor_grass_alt', 0.045], floor_dirt: ['floor_dirt_detail', 0.04], floor_stone: ['floor_stone_detail', 0.08] };
 
 // ---------------------------------------------------------------- wall pieces
 // Which Flare wall piece a dungeon / cave wall tile shows, from its 8 neighbours in map order N NE E SE S SW W NW
@@ -93,6 +111,8 @@ export class Renderer {
     this.game = null; this.hover = null; this.mouse = { x: -1, y: -1 };
     this.time = 0;
     this.wallCache = { area: null, roles: null };
+    // per-cell floor choices and edge overlays, rebuilt when the area changes
+    this.floorCache = new Map(); this.floorCacheArea = null; this._lum = new Map(); this.blendOk = true;
     this.resize();
     window.addEventListener('resize', () => this.resize());
   }
@@ -150,6 +170,7 @@ export class Renderer {
     if (!g || !g.area || !g.running) return;
     this.updateCamera(dt);
     const a = g.area;
+    if (this.floorCacheArea !== a) { this.floorCache = new Map(); this.floorCacheArea = a; }
     const animDt = (g.paused || g.dialogue || g.ui.modalOpen()) ? 0 : dt;
     const W = this.canvas.width, H = this.canvas.height;
     const corners = [this.toTile(0, 0), this.toTile(W, 0), this.toTile(0, H), this.toTile(W, H)];
@@ -231,10 +252,7 @@ export class Renderer {
   floorName(x, y, ch) {
     const a = this.game.area;
     const direct = { '.': 'floor_grass', ',': 'floor_dirt', 'm': 'floor_mud', ':': 'floor_stone', '=': this.assets.tiles.planks ? 'planks' : (a.outdoor ? 'floor_planks' : 'floor_tile'), 'r': 'floor_rug', '~': 'water', 's': 'floor_stone', 'b': 'floor_stone' };
-    if (direct[ch]) {
-      if (ch === '.' && hash(x, y, 3) % 5 === 0) return 'floor_grass_alt';
-      return direct[ch];
-    }
+    if (direct[ch]) return direct[ch];
     if (ch === 'X' || ch === '#' && !a.outdoor) {
       // Flare lays floor only under the pieces whose lit face meets the room; the interior and the back stubs stay black
       const role = this.wallRole(x, y);
@@ -251,10 +269,14 @@ export class Renderer {
     const ctx = this.ctx;
     const [cx, cy] = this.toScreen(x + 0.5, y + 0.5);
     if (this.useArt) {
-      const name = this.floorName(x, y, ch);
-      if (!name) return;
-      const tile = this.assets.tile(name, hash(x, y, 1));
-      if (tile) { this.blit(tile, cx, cy, dim); if (ch === 'd' && !this.buildingAt(x, y)) this.drawDoorway(cx, cy, dim); return; }
+      const f = this.floorAt(x, y, ch);
+      if (f === null) return;
+      if (f.tile) {
+        if (f.merged) this.blitCanvas(f.merged, cx, cy, dim);
+        else { this.blit(f.tile, cx, cy, dim); if (f.ov) this.blitCanvas(f.ov, cx, cy, dim); }
+        if (ch === 'd' && !this.buildingAt(x, y)) this.drawDoorway(cx, cy, dim);
+        return;
+      }
     }
     // ---- procedural fallback
     let color = t.color;
@@ -267,6 +289,135 @@ export class Renderer {
     else if (t.door) { ctx.fillStyle = shade('#5a3a1a', dim); ctx.fillRect(cx - 14, cy - 34, 28, 34); }
   }
   drawDoorway(cx, cy, dim) { const ctx = this.ctx; ctx.fillStyle = shade('#3a2a1a', dim); ctx.fillRect(cx - 16, cy - 40, 32, 40); ctx.fillStyle = shade('#6a4a2a', dim); ctx.fillRect(cx - 13, cy - 36, 26, 36); }
+
+  // ---------------------------------------------------------------- floors
+  /** Floor art of a cell: null for bare rock, otherwise { tile, ov, merged } with the base variant and, where a
+   *  different material borders the cell, a cached canvas that softens the shared edge (merged with the base for
+   *  still tiles, a separate overlay for animated water). */
+  floorAt(x, y, ch) {
+    const a = this.game.area; const key = y * a.width + x;
+    let f = this.floorCache.get(key);
+    if (f !== undefined) return f;
+    const name = this.floorName(x, y, ch);
+    f = null;
+    if (name) {
+      let tile = this.floorTile(name, x, y);
+      const det = FLOOR_DETAIL[name]; const dl = det && this.assets.tiles[det[0]];
+      if (dl && dl.length && nhash(x, y, 3) < det[1]) tile = dl[Math.floor(nhash(x, y, 4) * dl.length)];
+      f = { tile, ov: null, merged: null };
+      if (tile && ch !== 'd') {
+        // static floors get the base baked into the overlay (one drawImage per cell); animated water keeps them apart
+        const still = tile.frames.length === 1;
+        const ov = this.floorOverlay(x, y, name, still ? tile : null);
+        if (still) f.merged = ov; else f.ov = ov;
+      }
+    }
+    this.floorCache.set(key, f);
+    return f;
+  }
+  /** Draw a 96x48 cell canvas centred on (cx, cy). */
+  blitCanvas(c, cx, cy, alpha = 1) {
+    const ctx = this.ctx;
+    if (alpha !== 1) ctx.globalAlpha = alpha;
+    ctx.drawImage(c, cx - TW / 2, cy - TH / 2);
+    if (alpha !== 1) ctx.globalAlpha = 1;
+  }
+  /** Variant of a floor set at a cell. Low-frequency noise walks through the variants ordered by brightness (plus a
+   *  little per-cell jitter), so the tone drifts slowly across the ground instead of jumping at every diamond. */
+  floorTile(name, x, y) {
+    const list = this.assets.tiles[name];
+    if (!list || !list.length) return null;
+    const order = this.lumOrder(name, list);
+    let n = 0.6 * vnoise(x / 4.5, y / 4.5, 21) + 0.4 * vnoise(x / 1.8, y / 1.8, 22);
+    n = 0.5 + (n - 0.5) * 1.8 + (nhash(x, y, 2) - 0.5) * 0.18;
+    return list[order[Math.max(0, Math.min(list.length - 1, Math.floor(n * list.length)))]];
+  }
+  lumOrder(name, list) {
+    let o = this._lum.get(name);
+    if (o) return o;
+    const lum = list.map(t => this.tileLum(t));
+    o = list.map((_, i) => i).sort((p, q) => lum[p] - lum[q]);
+    this._lum.set(name, o);
+    return o;
+  }
+  tileLum(tile) {
+    try {
+      const c = this.scratch(tile.w, tile.h); const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.clearRect(0, 0, c.width, c.height);
+      const [fx, fy] = tile.frames[0];
+      ctx.drawImage(tile.image || this.assets.atlas, fx, fy, tile.w, tile.h, 0, 0, tile.w, tile.h);
+      const d = ctx.getImageData(0, 0, tile.w, tile.h).data;
+      let sum = 0, n = 0;
+      for (let i = 0; i < d.length; i += 16) if (d[i + 3] > 200) { sum += d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11; n++; }
+      return n ? sum / n : 0;
+    } catch (e) { this.blendOk = false; return 0; }
+  }
+  scratch(w, h) {
+    const c = this._scratch || (this._scratch = document.createElement('canvas'));
+    if (c.width < w || c.height < h) { c.width = Math.max(c.width, w); c.height = Math.max(c.height, h); }
+    return c;
+  }
+  /** Blend rank of the material at a cell; -1 for walls, doors and built floors, which keep hard edges. */
+  blendRank(x, y) {
+    const ch = this.game.tileChar(x, y);
+    if (ch === '#' || ch === 'X' || ch === 'd') return -1;
+    const r = BLEND_RANK[this.floorName(x, y, ch)];
+    return r === undefined ? -1 : r;
+  }
+  /** Overlay for a cell whose neighbours outrank it: their texture (the variant this cell would get as that
+   *  material, so it tiles with the real neighbour) masked to a ragged band along the shared edge, or a small blob at
+   *  a corner touched only diagonally. Rendered once into a 96x48 canvas; null when no neighbour outranks the cell. */
+  floorOverlay(x, y, name, base) {
+    const rank = BLEND_RANK[name];
+    if (rank === undefined || !this.blendOk) return null;
+    const nb = (dx, dy) => this.blendRank(x + dx, y + dy);
+    const parts = [];
+    for (const [dx, dy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) { const r = nb(dx, dy); if (r > rank && !(nb(dx, 0) >= r && nb(0, dy) >= r)) parts.push([dx, dy, r, true]); }
+    for (const [dx, dy] of [[1, 0], [0, 1], [-1, 0], [0, -1]]) { const r = nb(dx, dy); if (r > rank) parts.push([dx, dy, r, false]); }
+    if (!parts.length) return null;
+    try {
+      const ov = document.createElement('canvas'); ov.width = TW; ov.height = TH;
+      const octx = ov.getContext('2d');
+      const tmp = this._ovTmp || (this._ovTmp = document.createElement('canvas')); tmp.width = TW; tmp.height = TH;
+      const tctx = tmp.getContext('2d', { willReadFrequently: true });
+      const draw = (tile, ctx) => { const [fx, fy] = tile.frames[0]; ctx.drawImage(tile.image || this.assets.atlas, fx, fy, tile.w, tile.h, TW / 2 - tile.ox, TH / 2 - tile.oy, tile.w, tile.h); };
+      const spill = (tile, dx, dy, corner, widen, scale) => {
+        tctx.clearRect(0, 0, TW, TH); draw(tile, tctx);
+        const img = tctx.getImageData(0, 0, TW, TH);
+        this.maskEdge(img.data, x, y, dx, dy, corner, widen, scale);
+        tctx.putImageData(img, 0, 0);
+        octx.drawImage(tmp, 0, 0);
+      };
+      if (base) draw(base, octx);
+      for (const [dx, dy, r, corner] of parts) {
+        const tile = this.floorTile(SPILL_NAME[r], x, y);
+        if (!tile) continue;
+        // a muddy bank shows under the land spilling over water
+        if (rank === 0 && r > 3) { const mud = this.floorTile('floor_mud', x, y); if (mud) spill(mud, dx, dy, corner, 0.14, 0.75); }
+        spill(tile, dx, dy, corner, 0, 1);
+      }
+      return ov;
+    } catch (e) { this.blendOk = false; return null; }
+  }
+  /** Multiply the alpha of a 96x48 diamond by a soft band along the edge facing the neighbour at (dx, dy) in map space
+   *  (or a blob at that corner). The band width follows world-space noise, so it wanders and joins up across cells. */
+  maskEdge(data, x, y, dx, dy, corner, widen = 0, scale = 1) {
+    for (let py = 0; py < TH; py++) {
+      const ry = (py + 0.5 - TH / 2) / (TH / 2);
+      for (let px = 0; px < TW; px++) {
+        const i = (py * TW + px) * 4;
+        if (data[i + 3] === 0) continue;
+        const rx = (px + 0.5 - TW / 2) / (TW / 2);
+        const u = (rx + ry) / 2, v = (ry - rx) / 2;                       // map offsets from the cell centre, -0.5..0.5
+        const d = corner ? Math.max(0.5 - u * dx, 0.5 - v * dy) : (dx ? 0.5 - u * dx : 0.5 - v * dy);
+        const X = x + 0.5 + u, Y = y + 0.5 + v;
+        let n = 0.7 * vnoise(X * 2.3, Y * 2.3, 31) + 0.3 * vnoise(X * 6.1, Y * 6.1, 32);
+        n = Math.max(0, Math.min(1, 0.5 + (n - 0.5) * 2));
+        const band = (corner ? 0.05 + 0.25 * n : 0.08 + 0.34 * n) + widen;
+        data[i + 3] = (data[i + 3] * scale * (1 - sstep((d - band) / 0.2 + 0.5))) | 0;
+      }
+    }
+  }
 
   /** Rock tiles; outside the map counts as rock. */
   isWall(x, y) { const a = this.game.area; if (x < 0 || y < 0 || x >= a.width || y >= a.height) return true; const c = a.tiles[y][x]; return c === '#' || c === 'X'; }
