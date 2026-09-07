@@ -48,6 +48,8 @@ const FLOOR_DETAIL = { floor_grass: ['floor_grass_alt', 0.045], floor_dirt: ['fl
 // table in tools/build-assets.mjs for the tile ids).
 const N8 = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]];
 const NO_FLOOR = new Set(['nw_low', 'ne_low', 'nw_low_cap', 'ne_low_cap', 'corner_ne', 'corner_sw', 'corner_se', 'back_y', 'back_x', 'back_corner']);
+/** Catalog name of a wall role's tile; the low lit wall is a Blender extra shared by the dungeon set. */
+function wallTileName(set, role) { return role === 'low_lit' ? 'lowwall' : role === 'post' ? 'tallpost' : set + 'wall_' + role; }
 function wallPieceRole(sig) {
   const [n, ne, e, se, s, sw, w, nw] = sig;
   const W = (c) => c === 'W', F = (c) => c === 'F';
@@ -545,8 +547,9 @@ export class Renderer {
     const at = (x, y) => (x < 0 || y < 0 || x >= a.width || y >= a.height) ? null : roles.get(key(x, y)) || null;
     const set = (x, y, r) => roles.set(key(x, y), r);
     const F = (x, y) => this.wallClass(x, y) === 'F';
-    const tall = (x, y) => { const r = at(x, y); return !!r && this.tallPiece(this.assets.tile(this.wallSet(x, y) + 'wall_' + r, 0)); };
+    const tall = (x, y) => { const r = at(x, y); return !!r && this.tallPiece(this.assets.tile(wallTileName(this.wallSet(x, y), r), 0)); };
     const low = (x, y) => !!at(x, y) && !tall(x, y);
+    const lowered = new Set();
     // dungeon only: the back row of the wall between two rooms one tile apart (floor straight behind it, wall in
     // front) is the low rubble Flare also uses there instead of the tall black 67/66, which would hide the far room's
     // floor along the wall, and the block pieces at the ends of such a row come down with it; the cave set has no
@@ -554,13 +557,32 @@ export class Renderer {
     for (const [x, y] of cells) {
       if (this.wallSet(x, y) !== '') continue;
       const r = at(x, y);
-      if (r === 'back_x' && F(x, y - 1)) set(x, y, 'thin_x');
-      else if (r === 'back_y' && F(x - 1, y)) set(x, y, 'thin_y');
-      else if (r === 'block_nw' && (F(x, y - 1) || F(x - 1, y))) set(x, y, 'tip_nw');
-      else if (r === 'block_ne' && (F(x, y - 1) || F(x + 1, y))) set(x, y, 'tip_ne');
-      else if (r === 'block_sw' && F(x, y + 1)) set(x, y, 'sw');
-      else if (r === 'block_sw' && F(x - 1, y)) set(x, y, 'tip_sw');
-      else if (r === 'back_corner' && (low(x, y - 1) || low(x - 1, y))) set(x, y, 'corner_se');
+      let to = null;
+      if (r === 'back_x' && F(x, y - 1)) to = 'thin_x';
+      else if (r === 'back_y' && F(x - 1, y)) to = 'thin_y';
+      else if (r === 'block_nw' && (F(x, y - 1) || F(x - 1, y))) to = 'tip_nw';
+      else if (r === 'block_ne' && (F(x, y - 1) || F(x + 1, y))) to = 'tip_ne';
+      else if (r === 'block_sw' && F(x, y + 1)) to = 'sw';
+      else if (r === 'block_sw' && F(x - 1, y)) to = 'tip_sw';
+      else if (r === 'back_corner' && (low(x, y - 1) || low(x - 1, y))) to = 'corner_se';
+      if (to) { set(x, y, to); lowered.add(key(x, y)); }
+    }
+    // the near row of such a wall, whose tall lit face would still hide the far room's edge, becomes the
+    // waist-high lit wall rendered in Blender (assets/extra/lowwall, see tools/blender/render_iso.py) when present
+    if (this.assets.tile('lowwall', 0)) for (const [x, y] of cells) {
+      if (this.wallSet(x, y) !== '') continue;
+      const r = at(x, y);
+      const behindLow = (r === 'sw' || r === 'tip_se') && lowered.has(key(x, y - 1)) || (r === 'se' || r === 'tip_se') && lowered.has(key(x - 1, y));
+      if (behindLow) set(x, y, 'low_lit');
+    }
+    // where such a wall ends or meets a tall wall, the tall piece there would show a black face above the low
+    // wall: it becomes the matching Blender post (assets/extra/tallpost), lit on both faces and a full tile wide
+    const BLACK_TALL = new Set(['back_x', 'back_y', 'corner_sw', 'corner_ne', 'block_nw', 'block_ne', 'block_sw', 'back_corner']);
+    if (this.assets.tile('tallpost', 0)) for (const [x, y] of cells) {
+      const r = at(x, y), k = key(x, y);
+      const lowNext = (i, j) => lowered.has(key(i, j)) || at(i, j) === 'low_lit';
+      if (lowered.has(k) || r === 'low_lit' || this.wallSet(x, y) !== '') continue;
+      if ((BLACK_TALL.has(r) || r === 'sw' || r === 'se' || r === 'tip_se') && (lowNext(x + 1, y) || lowNext(x, y + 1))) set(x, y, 'post');
     }
     for (const [x, y] of cells) {
       let role = at(x, y);
@@ -582,15 +604,17 @@ export class Renderer {
       set(x, y, role);
     }
     // a tall piece with one lit face shows its black face where the next piece along the wall is low or a doorway:
-    // the pillar lit on both faces (73) closes the run, and an open door reads as a gap between two lit jambs
+    // the Blender post lit on both faces closes the run (Flare's slim pillar 73 without it), and beside a door the
+    // pillar makes an open door read as a gap between two lit jambs
+    const post = this.assets.tile('tallpost', 0) ? 'post' : 'tip_se';
     for (const [x, y] of cells) {
       if (this.wallSet(x, y) !== '') continue;
       const role = at(x, y);
-      if (role === 'sw' && (this.isDoor(x + 1, y) || low(x + 1, y))) set(x, y, 'tip_se');
-      else if (role === 'se' && (this.isDoor(x, y + 1) || low(x, y + 1))) set(x, y, 'tip_se');
+      if (role === 'sw' && this.isDoor(x + 1, y) || role === 'se' && this.isDoor(x, y + 1)) set(x, y, 'tip_se');
+      else if (role === 'sw' && low(x + 1, y) || role === 'se' && low(x, y + 1)) set(x, y, post);
     }
   }
-  wallTile(x, y) { const role = this.wallRole(x, y); return role ? this.assets.tile(this.wallSet(x, y) + 'wall_' + role, hash(x, y, 5)) : null; }
+  wallTile(x, y) { const role = this.wallRole(x, y); return role ? this.assets.tile(wallTileName(this.wallSet(x, y), role), hash(x, y, 5)) : null; }
   /** Only tall pieces can hide the player (so only they turn translucent in front of it) or carry a tall corner. */
   tallPiece(tile) { return !!tile && tile.oy > 100; }
 

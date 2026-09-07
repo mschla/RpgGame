@@ -26,6 +26,7 @@ assets/extra/<name>.png, <name>.json and adds the name to assets/extra/sprites.j
 The game picks these up automatically (see js/game/assets.js).
 """
 import argparse
+import random
 import functools
 import json
 import math
@@ -282,6 +283,44 @@ def build_planks():
     cube((0, 0.47, 0.02), (1.0, 0.07, 0.06), beam, 'beam_b')
 
 
+# ---------------------------------------------------------------- low dungeon wall
+LOWWALL_H = 0.58   # height of the stone core; the cap on top brings the piece to Flare's low-stub height
+LOWWALL_LIGHTS = {'key_az': -12, 'fill_az': 70, 'fill_energy': 1.4}   # key almost from the camera: Flare lights both visible faces alike
+
+
+def build_lowwall(h=LOWWALL_H, courses=3):
+    """A waist-high dungeon wall filling one tile, lit on both visible faces, in the colours of Flare's
+    dungeon set. Flare has tall lit walls and low black stubs but no low lit wall; the renderer uses this
+    one for the near row of a two-tile-thick wall between rooms, so the far room's floor is never hidden.
+    With the height of Flare's tall pieces it is the post that ends such a wall or joins it to a tall one."""
+    rng = random.Random(7)
+    mortar = material('mortar', (0.028, 0.023, 0.019), roughness=1.0, noise=(14, (0.012, 0.010, 0.008)))
+    stone = material('stone', (0.078, 0.061, 0.049), roughness=0.9, noise=(6, (0.036, 0.029, 0.024)), bump=(24, 0.35))
+    cap = material('cap', (0.15, 0.118, 0.092), roughness=0.85, noise=(9, (0.10, 0.078, 0.062)), bump=(30, 0.12))
+    half = 0.5   # the full tile, so the caps and courses of neighbouring tiles join into one wall
+    cube((0, 0, h / 2), (2 * half - 0.05, 2 * half - 0.05, h), mortar, 'core')
+    gap = 0.022
+    ch = (h - 0.06) / courses
+    for face in ('x', 'y'):
+        for row in range(courses):
+            z0 = 0.03 + row * ch
+            n = 4
+            bl = (2 * half - (n - 1) * gap) / n
+            offset = (row % 2) * bl * 0.5
+            a = -half + offset
+            while a < half - 0.02:
+                length = min(bl, half - a)
+                depth = 0.045 + rng.uniform(-0.008, 0.008)
+                centre = a + length / 2
+                if face == 'x':
+                    cube((half - depth / 2, centre, z0 + (ch - gap) / 2), (depth, length - gap, ch - gap), stone, 'blk')
+                else:
+                    cube((centre, half - depth / 2, z0 + (ch - gap) / 2), (length - gap, depth, ch - gap), stone, 'blk')
+                a += length + gap
+    cube((0, 0, h + 0.04), (2 * half + 0.02, 2 * half + 0.02, 0.08), cap, 'cap')
+    cube((0, 0, 0.03), (2 * half + 0.01, 2 * half + 0.01, 0.06), cap, 'plinth')
+
+
 # ---------------------------------------------------------------- log houses
 # Town buildings are assembled per tile by Renderer.drawBuilding from these pieces: a wall segment for
 # each open SW / SE side (a doorway variant for 'd' tiles), a corner post, a roof cap (colour variants
@@ -495,6 +534,7 @@ def crop_default(arr, origin, ctx):
 
 
 PROPS = {'well': build_well, 'logblock': build_logblock, 'palisade': build_palisade, 'planks': build_planks,
+         'lowwall': build_lowwall, 'tallpost': functools.partial(build_lowwall, 2.0, 9),
          'logwall_sw': functools.partial(build_logwall, 'sw'), 'logwall_se': functools.partial(build_logwall, 'se'),
          'logdoor_sw': functools.partial(build_logwall, 'sw', True), 'logdoor_se': functools.partial(build_logwall, 'se', True),
          'logpost_s': functools.partial(build_logpost, 's'), 'logpost_w': functools.partial(build_logpost, 'w'), 'logpost_e': functools.partial(build_logpost, 'e'),
@@ -822,7 +862,7 @@ def cmd_props(args):
                 if args.engine == 'CYCLES':
                     scene.cycles.samples = args.samples
                 cam = setup_camera(scene, args.size)
-                setup_lights(scene, cam, **(HOUSE_LIGHTS if name in HOUSE_PROPS else {}))
+                setup_lights(scene, cam, **(HOUSE_LIGHTS if name in HOUSE_PROPS else LOWWALL_LIGHTS if name in ('lowwall', 'tallpost') else {}))
                 build()
                 origin = project(scene, cam, Vector((0, 0, 0)), args.size)
                 arr = render_frame(scene, os.path.join(tmp, name + '.png'))

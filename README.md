@@ -70,7 +70,7 @@ node tools/build-assets.mjs /path/to/flare-game
 `tools/blender/render_iso.py` renders models through a camera that matches the Flare projection (one Blender unit is one map tile) and writes files the game loads from `assets/extra/`. It works inside Blender (`blender -b -P tools/blender/render_iso.py -- ...`) or with the `bpy` pip package.
 
 ```
-python tools/blender/render_iso.py props                      # built-in well, log-house pieces, log-cabin block, palisade, planks
+python tools/blender/render_iso.py props                      # built-in well, log-house pieces, log-cabin block, palisade, planks, low dungeon wall and post
 python tools/blender/render_iso.py --size 384 props --samples 256 logwall_sw logwall_se logdoor_sw logdoor_se \
     logpost_s logpost_w logpost_e roof roof_rim_nw roof_rim_ne   # just the log-house set
 python tools/blender/render_iso.py --size 384 builtin wolf    # animated wolf; also: builtin rat
@@ -79,7 +79,7 @@ python tools/blender/render_iso.py creature --blend wolf.blend --object Wolf --n
     --actions stance=Idle,run=Run,swing=Bite,hit=Hit,die=Death --frames 8 --scale 0.8
 ```
 
-Props become tiles; creatures become animated sprite sheets in the same format as the Flare ones, listed in `assets/extra/sprites.json`. Point a monster at one with `sprite: 'wolf'` in `js/data/monsters.js`.
+Props become tiles (`lowwall` and `tallpost` are the waist-high lit wall and the post the renderer uses for a two-tile-thick wall between rooms, which Flare's set has no pieces for); creatures become animated sprite sheets in the same format as the Flare ones, listed in `assets/extra/sprites.json`. Point a monster at one with `sprite: 'wolf'` in `js/data/monsters.js`.
 
 The renderer uses `well` and `palisade` when present, and assembles the town's log houses (outdoor `#` / `d` tiles that form 2x2 blocks) from per-tile pieces: `logwall_sw` / `logwall_se` (one tile of wall face each, cut from the middle of a 3-tile render and made exactly periodic so segments join without a seam), `logdoor_sw` / `logdoor_se` (the same with a dark doorway, used for `d` tiles; the script renders the plain wall of that face first so the doorway's edge columns match it), `logpost_s` / `logpost_w` / `logpost_e` (corner posts), `roof` (a tile of overlapping shingle courses, rendered with the neighbouring tiles' courses as shadow casters so it tiles seamlessly; its colour variants are picked per building) and `roof_rim_nw` / `roof_rim_ne` (beams along the roof's back edges, left out where the roof runs into the house's own wall in a notch). The house set is lit from the left of the screen so every course throws a shadow on the one in front of it. Every piece stays inside its tile's column so the x+y depth sort composes them correctly. An exit on a house door tile is drawn as the glow of the doorway, which is also its click target. Without those pieces the buildings fall back to the `logblock` cube, then to the Flare wall block.
 
