@@ -179,18 +179,20 @@ export class Renderer {
     const minX = Math.max(0, Math.min(...corners.map(c => c[0])) - 3), maxX = Math.min(a.width - 1, Math.max(...corners.map(c => c[0])) + 3);
     const minY = Math.max(0, Math.min(...corners.map(c => c[1])) - 3), maxY = Math.min(a.height - 1, Math.max(...corners.map(c => c[1])) + 6);
     const dimFor = (vis) => vis ? 1 : (a.outdoor ? 0.7 : 0.45);
+    // log houses are lit and revealed as a whole: a roof with a bright rim and a dim middle looks wrong
+    const houses = a.outdoor && this.hasLogHouse ? this.buildingIndex().list : null;
+    if (houses) for (const b of houses) { b.explored = b.tiles.some(([i, j]) => g.isExplored(i, j)); b.visible = b.tiles.some(([i, j]) => g.isVisible(i, j)); }
 
     // floor pass
     for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) {
       if (!g.isExplored(x, y)) continue;
       const ch = a.tiles[y][x]; const t = TILE[ch] || TILE['.'];
-      this.drawFloor(x, y, ch, t, dimFor(g.isVisible(x, y)));
+      // the threshold of a house door is dimmed with the house, so it matches the doorway drawn over it
+      const bld = houses && ch === 'd' ? this.buildingAt(x, y) : null;
+      this.drawFloor(x, y, ch, t, dimFor(bld ? bld.visible : g.isVisible(x, y)));
     }
     // objects & creatures, depth sorted
     const items = [];
-    // log houses are lit and revealed as a whole: a roof with a bright rim and a dim middle looks wrong
-    const houses = a.outdoor && this.hasLogHouse ? this.buildingIndex().list : null;
-    if (houses) for (const b of houses) { b.explored = b.tiles.some(([i, j]) => g.isExplored(i, j)); b.visible = b.tiles.some(([i, j]) => g.isVisible(i, j)); }
     for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) {
       const ch = a.tiles[y][x]; const t = TILE[ch];
       if (!t) continue;
@@ -214,7 +216,9 @@ export class Renderer {
       } else {
         if (!g.isExplored(e.x, e.y)) continue;
         if (e.type === 'trap' && !e.found) continue;
-        items.push({ d: e.x + e.y + ((e.w || 1) - 1) / 2 - 0.02, ent: e });
+        // an exit in a log-house doorway is drawn as the glow of the opening, after the door strip
+        const houseDoor = houses && e.type === 'transition' && this.houseDoor(e);
+        items.push({ d: houseDoor ? e.x + e.y + 0.5 : e.x + e.y + ((e.w || 1) - 1) / 2 - 0.02, ent: e });
       }
     }
     items.sort((p, q) => p.d - q.d);
@@ -224,16 +228,17 @@ export class Renderer {
         const vis = it.bld ? it.bld.visible : g.isVisible(it.x, it.y);
         let inFront;
         if (it.bld) {
-          // a house tile fades when its pieces (roof up to 5.5 rows up-screen, 96 px wide) would cover the player sprite
+          // a house tile fades when its pieces (roof up to 4.5 rows up-screen, 96 px wide) would cover the player sprite
           const dd = it.x + it.y + 1 - pd, dx = it.x - it.y - (pl.x - pl.y);
-          inFront = dd > 0.5 && dd < 5.5 && Math.abs(dx) < 1.45;
+          inFront = dd > 0.5 && dd < 4.5 && Math.abs(dx) < 1.45;
         } else {
           // trees, door art, tall wall pieces and the outdoor brick blocks can hide the player; a door stands in a
           // one-tile wall, so it also covers the player right behind it (the tile at the same depth)
           const tall = it.tile.tree || it.tile.door || it.tile.height && (!it.wall || this.tallPiece(it.wall));
           inFront = tall && it.x + it.y > pd + (it.tile.door ? -0.5 : 0.5) && Math.abs(it.x - pl.x) < 4 && Math.abs(it.y - pl.y) < 4;
         }
-        const alpha = dimFor(vis) * (inFront ? 0.4 : 1);
+        // a faded house keeps enough body to read as a see-through roof rather than a hole
+        const alpha = dimFor(vis) * (inFront ? (it.bld ? 0.55 : 0.4) : 1);
         if (it.bld) this.drawBuilding(it.x, it.y, it.ch, it.bld, alpha);
         else this.drawObject(it.x, it.y, it.tile, it.ch, alpha, it.wall);
       } else if (it.ent.hp !== undefined) this.drawCreature(it.ent, dt, animDt);
@@ -265,7 +270,8 @@ export class Renderer {
       // Flare lays floor only under the pieces whose lit face meets the room; the interior and the back stubs stay black
       const role = this.wallRole(x, y);
       if (!role || NO_FLOOR.has(role)) return null;
-    } else if (ch === '#' || (ch === 'd' && this.buildingAt(x, y))) return 'floor_stone';
+    } else if (ch === '#' && !this.buildingAt(x, y)) return 'floor_stone';
+    // log-house tiles (and object tiles) borrow the ground of a walkable neighbour: it shows through a faded roof
     for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [-1, -1]]) {
       const c = this.game.tileChar(x + dx, y + dy);
       if (direct[c] && c !== '~') return direct[c] === 'floor_rug' ? 'floor_stone' : direct[c];
@@ -544,9 +550,11 @@ export class Renderer {
   }
   buildingAt(x, y) {
     const a = this.game.area;
-    if (!a.outdoor || !this.hasLogHouse) return null;
+    if (!a.outdoor || !this.hasLogHouse || x < 0 || y < 0 || x >= a.width || y >= a.height) return null;
     return this.buildingIndex().map.get(y * a.width + x) || null;
   }
+  /** The house whose doorway an exit sits in (null for exits on open ground). */
+  houseDoor(e) { return this.game.tileChar(e.x, e.y) === 'd' ? this.buildingAt(e.x, e.y) : null; }
   /** One tile of a log house: a wall segment on each open SW / SE side (the doorway variant for 'd'),
    *  posts on the outer corners, then the roof cap and the rim beams along the hidden NW / NE edges.
    *  Every piece stays inside the tile's column, so drawing them at the tile's depth composes correctly
@@ -563,8 +571,11 @@ export class Renderer {
     if (oS && oW) piece('logpost_w');
     if (oE && oN) piece('logpost_e');
     piece('roof', bld.seed);
-    if (oW) piece('roof_rim_nw');
-    if (oN) piece('roof_rim_ne');
+    // in a notch (the tile behind, x-1 y-1, belongs to the house) the roof runs into that tile's wall, whose
+    // face would otherwise be crossed by a rim beam that reads as floating in front of it
+    const notch = B(x - 1, y - 1);
+    if (oW && !notch) piece('roof_rim_nw');
+    if (oN && !notch) piece('roof_rim_ne');
   }
   /** Draw a tile so its image bottom sits on the diamond's bottom corner (for block tiles whose origin is at their top). */
   blitBottom(tile, cx, cy, alpha = 1) {
@@ -636,9 +647,29 @@ export class Renderer {
     const ctx = this.ctx;
     const hovered = this.hover === e;
     if (e.type === 'transition') {
+      const pulse = 0.5 + Math.sin(this.time * 3) * 0.2;
+      const bld = this.houseDoor(e);
+      if (bld) {
+        // the glow of the doorway opening in the house wall (see logdoor_* in tools/blender/render_iso.py):
+        // a 0.7-tile wide, 1.28-tile tall opening in the SW face (y + 1) and / or the SE face (x + 1)
+        const [cx, cy] = this.toScreen(e.x + 0.5, e.y + 0.5);
+        const hw = 0.35 * TW / 2, hh = 0.35 * TH / 2, top = 75;
+        let b = null;
+        const opening = (sx0, sy0, sx1, sy1) => {
+          ctx.beginPath(); ctx.moveTo(sx0, sy0); ctx.lineTo(sx1, sy1); ctx.lineTo(sx1, sy1 - top); ctx.lineTo(sx0, sy0 - top); ctx.closePath();
+          ctx.fillStyle = `rgba(255,210,100,${(hovered ? 0.18 : 0.04 + pulse * 0.06) * dim})`; ctx.fill();
+          ctx.strokeStyle = `rgba(255,230,120,${(hovered ? 0.95 : pulse) * dim})`; ctx.lineWidth = 2; ctx.stroke();
+          // the click target is the opening plus its frame: a few pixels of slack on every side
+          const x0 = Math.min(sx0, sx1) - 8, y0 = Math.min(sy0, sy1) - top - 4, x1 = Math.max(sx0, sx1) + 8, y1 = Math.max(sy0, sy1) + 4;
+          b = b ? { x: Math.min(b.x, x0), y: Math.min(b.y, y0), w: Math.max(b.x + b.w, x1) - Math.min(b.x, x0), h: Math.max(b.y + b.h, y1) - Math.min(b.y, y0) } : { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+        };
+        if (!this.buildingAt(e.x, e.y + 1)) opening(cx - TW / 4 - hw, cy + TH / 4 - hh, cx - TW / 4 + hw, cy + TH / 4 + hh);
+        if (!this.buildingAt(e.x + 1, e.y)) opening(cx + TW / 4 + hw, cy + TH / 4 - hh, cx + TW / 4 - hw, cy + TH / 4 + hh);
+        e._bounds = b;
+        return;
+      }
       for (let i = 0; i < (e.w || 1); i++) {
         const [cx, cy] = this.toScreen(e.x + i + 0.5, e.y + 0.5);
-        const pulse = 0.5 + Math.sin(this.time * 3) * 0.2;
         ctx.strokeStyle = `rgba(255,230,120,${pulse * dim})`; ctx.lineWidth = 2;
         this.diamond(ctx, cx, cy, TW - 10, TH - 5); ctx.stroke();
         ctx.fillStyle = `rgba(255,230,120,${0.12 * dim})`; ctx.fill();

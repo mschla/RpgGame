@@ -101,20 +101,21 @@ def project(scene, cam, point, size):
     return co.x * size, (1 - co.y) * size
 
 
-def setup_lights(scene, cam):
+def setup_lights(scene, cam, key_az=-60, fill_az=120, fill_energy=0.9):
+    """Sun plus a softer fill. `key_az` / `fill_az` are azimuths relative to the camera: the default key
+    comes from the lower left of the screen, a little in front of the camera."""
     sun_data = bpy.data.lights.new('Sun', 'SUN')
     sun_data.energy = 3.0
     sun_data.angle = math.radians(5)
     sun = bpy.data.objects.new('Sun', sun_data)
     scene.collection.objects.link(sun)
-    # light from the upper left of the screen, a little in front of the camera
-    az = cam.rotation_euler.z - math.radians(60)
+    az = cam.rotation_euler.z + math.radians(key_az)
     sun.rotation_euler = (math.radians(45), 0, az)
     fill_data = bpy.data.lights.new('Fill', 'SUN')
-    fill_data.energy = 0.9
+    fill_data.energy = fill_energy
     fill = bpy.data.objects.new('Fill', fill_data)
     scene.collection.objects.link(fill)
-    fill.rotation_euler = (math.radians(55), 0, cam.rotation_euler.z + math.radians(120))
+    fill.rotation_euler = (math.radians(55), 0, cam.rotation_euler.z + math.radians(fill_az))
     world = bpy.data.worlds.new('World')
     world.use_nodes = True
     bg = world.node_tree.nodes['Background']
@@ -294,10 +295,17 @@ WALL_H = FOUNDATION + 2 * sum(LOG_RADII)         # 1.67 tiles
 DOOR_H = FOUNDATION + 2 * sum(LOG_RADII[:6])     # the two top courses run over the doorway
 DOOR_HALF = 0.35                                 # half width of the doorway along the wall
 FASCIA = 0.10                                    # board under the roof, flush with the walls
-SHINGLE = 0.045
-ROOF_TOP = WALL_H + FASCIA + SHINGLE
+COURSES = 4                                      # shingle courses per tile, stepping down towards the SE edge
+COURSE_T = 0.05                                  # thickness of a course
+COURSE_RISE = 0.05                               # how much a course climbs over the one in front of it
+ROOF_TOP = WALL_H + FASCIA + COURSE_T + COURSE_RISE
 POST = 0.2
-ROOF_COLORS = [(0.19, 0.115, 0.06), (0.22, 0.095, 0.065), (0.13, 0.145, 0.09)]   # brown, weathered red, mossy
+ROOF_COLORS = [(0.16, 0.095, 0.05), (0.19, 0.08, 0.055), (0.11, 0.125, 0.075)]   # brown, weathered red, mossy
+# The house set is lit from the left of the screen (key) with a low fill from the front right: the shingle
+# courses then throw a shadow onto the course in front of them, which a key from the lower left cannot do.
+HOUSE_LIGHTS = {'key_az': -90, 'fill_az': 60, 'fill_energy': 0.9}
+HOUSE_PROPS = ('logwall_sw', 'logwall_se', 'logdoor_sw', 'logdoor_se', 'logpost_s', 'logpost_w', 'logpost_e',
+               'roof', 'roof_rim_nw', 'roof_rim_ne')
 
 
 def wall_pt(face, along, across, z):
@@ -308,11 +316,13 @@ def wall_pt(face, along, across, z):
 def build_logwall(face, door=False):
     """Three tiles of horizontal log wall (the middle one is cropped out, see crop_strip)."""
     along = 'Y' if face == 'sw' else 'X'
-    logs = material('logs', (0.25, 0.155, 0.072), noise=(9, (0.12, 0.07, 0.03)), bump=(28, 0.25), flat_axis=along)
-    chink = material('chinking', (0.10, 0.085, 0.07), noise=(12, (0.05, 0.04, 0.035)), flat_axis=along)
-    stone = material('footing', (0.21, 0.20, 0.19), noise=(10, (0.11, 0.10, 0.095)), flat_axis=along)
-    frame = material('frame', (0.16, 0.10, 0.045), noise=(10, (0.09, 0.055, 0.025)), flat_axis='Z')
+    # dark, saturated wood so the walls sit with the Flare props (sign post, crates) rather than above them
+    logs = material('logs', (0.18, 0.108, 0.048), noise=(9, (0.085, 0.048, 0.02)), bump=(28, 0.25), flat_axis=along)
+    chink = material('chinking', (0.07, 0.058, 0.046), noise=(12, (0.035, 0.028, 0.024)), flat_axis=along)
+    stone = material('footing', (0.17, 0.16, 0.15), noise=(10, (0.09, 0.08, 0.075)), flat_axis=along)
+    frame = material('frame', (0.085, 0.052, 0.024), noise=(10, (0.05, 0.03, 0.014)), flat_axis='Z')
     dark = material('interior', (0.012, 0.009, 0.006), roughness=1.0)
+    sill = material('sill', (0.03, 0.026, 0.022), roughness=1.0)
     rot = (math.radians(90), 0, 0) if face == 'sw' else (0, math.radians(90), 0)
     half = DOOR_HALF
     spans = [(-1.5, -half), (half, 1.5)] if door else [(-1.5, 1.5)]
@@ -331,49 +341,83 @@ def build_logwall(face, door=False):
         for s in (-1, 1):
             cube(wall_pt(face, s * (half - 0.035), 0.39, DOOR_H / 2), wall_pt(face, 0.07, 0.10, DOOR_H), frame, 'jamb')
         cube(wall_pt(face, 0, 0.39, DOOR_H - 0.04), wall_pt(face, 2 * half, 0.10, 0.08), frame, 'lintel')
-        cube(wall_pt(face, 0, -0.2, WALL_H / 2), wall_pt(face, 1.0, 0.05, WALL_H), dark, 'interior')
+        # the dark interior sits right behind the frame and a dark sill fills the opening down to the
+        # ground and a little in front of the face, so no floor shows through the lower half of the doorway
+        cube(wall_pt(face, 0, 0.27, WALL_H / 2), wall_pt(face, 1.0, 0.05, WALL_H), dark, 'interior')
+        cube(wall_pt(face, 0, 0.39, FOUNDATION / 2 - 0.005), wall_pt(face, 2 * half + 0.04, 0.30, FOUNDATION - 0.01), sill, 'sill')
 
 
 def build_logpost(corner):
     """Square corner post: 's' at the south corner (both faces open), 'w' / 'e' where a face ends."""
-    wood = material('post', (0.20, 0.12, 0.055), noise=(12, (0.10, 0.06, 0.028)), bump=(40, 0.2), flat_axis='Z')
+    wood = material('post', (0.135, 0.08, 0.036), noise=(12, (0.07, 0.04, 0.018)), bump=(40, 0.2), flat_axis='Z')
     h = 0.5 - POST / 2
     cx, cy = {'s': (h, h), 'w': (h, -h), 'e': (-h, h)}[corner]
     cube((cx, cy, WALL_H / 2), (POST, POST, WALL_H), wood, 'post')
 
 
-def build_roof(variant):
-    """Flat shingle roof cap for one tile on top of the fascia board; tiles seamlessly with itself."""
-    fascia = material('fascia', (0.17, 0.105, 0.05), noise=(10, (0.09, 0.055, 0.025)), flat_axis='XY')
-    cube((0, 0, WALL_H + FASCIA / 2), (1, 1, FASCIA), fascia, 'fascia')
-    base = ROOF_COLORS[variant]
-    mats = [material(f'shingle{i}', tuple(c * f for c in base), noise=(30, tuple(c * f * 0.55 for c in base)), roughness=0.9)
-            for i, f in enumerate((1.0, 0.86, 1.12, 0.94, 1.06))]
-    rows, per, gap = 8, 6, 0.012
-    w, ln = 1 / rows, 1 / per
-    for j in range(rows):
+def slab(name, x0, x1, y0, y1, z0, z1, mat):
+    """A course of shingles: a box from y0 to y1 whose underside and top climb from z0 at y0 to z1 at y1,
+    with vertical ends (the SE end is the exposed edge of the course)."""
+    v = [(x0, y0, z0), (x1, y0, z0), (x1, y1, z1), (x0, y1, z1),
+         (x0, y0, z0 + COURSE_T), (x1, y0, z0 + COURSE_T), (x1, y1, z1 + COURSE_T), (x0, y1, z1 + COURSE_T)]
+    f = [(0, 3, 2, 1), (4, 5, 6, 7), (0, 1, 5, 4), (1, 2, 6, 5), (2, 3, 7, 6), (3, 0, 4, 7)]
+    mesh = bpy.data.meshes.new(name)
+    mesh.from_pydata(v, [], f)
+    mesh.update()
+    o = bpy.data.objects.new(name, mesh)
+    bpy.context.scene.collection.objects.link(o)
+    o.data.materials.append(mat)
+    return o
+
+
+def roof_courses(mats, ty, tx, visible):
+    """Shingle courses of the roof tile at (map x = ty, map y = tx) in tile units: COURSES rows running along
+    Blender X (map y), each climbing towards the SE so its exposed edge stands above the next row, split into
+    staggered shingles along the row. The layout repeats exactly per tile, so caps join without a seam."""
+    base = WALL_H + FASCIA
+    p, per, gap = 1 / COURSES, 5, 0.03
+    ln = 1 / per
+    for j in range(COURSES):
+        y0 = ty - 0.5 + j * p
         off = (j % 2) * ln / 2
-        x = -0.5 + (j + 0.5) * w
-        grid = [-0.5 + off + k * ln for k in range(per + 1)]
-        edges = sorted({-0.5, 0.5} | {g for g in grid if -0.5 <= g <= 0.5})
+        grid = [tx - 0.5 + off + k * ln for k in range(per + 1)]
+        edges = sorted({tx - 0.5, tx + 0.5} | {g for g in grid if tx - 0.5 <= g <= tx + 0.5})
         on_grid = lambda a: any(abs(a - g) < 1e-6 for g in grid)
         for a0, a1 in zip(edges, edges[1:]):
             if a1 - a0 < 1e-6:
                 continue
-            key = int(math.floor(((a0 + a1) / 2 - off + 0.5) / ln + 1e-6)) % per   # the two cut halves of a shingle match
+            key = int(math.floor(((a0 + a1) / 2 - off - tx + 0.5) / ln + 1e-6)) % per   # the two cut halves of a shingle match
             b0, b1 = a0 + (gap / 2 if on_grid(a0) else 0), a1 - (gap / 2 if on_grid(a1) else 0)
-            z = WALL_H + FASCIA + SHINGLE / 2 + 0.004 * ((j * 7 + key * 3) % 3)
-            cube((x, (b0 + b1) / 2, z), (w - gap, b1 - b0, SHINGLE), mats[(j * 3 + key * 2 + (j * key) % 3) % len(mats)], f'shingle{j}_{key}')
+            jitter = 0.004 * ((j * 7 + key * 3) % 3)
+            o = slab(f'course{j}_{key}', b0, b1, y0, y0 + p, base + jitter, base + COURSE_RISE + jitter,
+                     mats[(j * 3 + key * 2 + (j * key) % 3) % len(mats)])
+            if not visible:
+                o.visible_camera = False
+
+
+def build_roof(variant):
+    """Shingle roof cap for one tile on top of the fascia board; tiles seamlessly with itself. The
+    neighbouring tiles' courses are in the scene as shadow casters only, so the shadow a course throws
+    onto the tile in front of it is baked into every tile alike."""
+    fascia = material('fascia', (0.13, 0.08, 0.038), noise=(10, (0.07, 0.042, 0.02)), flat_axis='XY')
+    cube((0, 0, WALL_H + FASCIA / 2), (1, 1, FASCIA), fascia, 'fascia')
+    base = ROOF_COLORS[variant]
+    mats = [material(f'shingle{i}', tuple(c * f for c in base), noise=(30, tuple(c * f * 0.55 for c in base)), roughness=0.9)
+            for i, f in enumerate((1.0, 0.8, 1.18, 0.9, 1.1))]
+    for ty in (-1, 0, 1):
+        for tx in (-1, 0, 1):
+            roof_courses(mats, ty, tx, visible=(ty == 0 and tx == 0))
 
 
 def build_roof_rim(edge):
-    """Low beam along the roof's NW ('nw', map x = x0) or NE ('ne', map y = y0) edge."""
-    beam = material('rim', (0.15, 0.095, 0.045), noise=(10, (0.08, 0.05, 0.025)), flat_axis='XY')
-    z = ROOF_TOP + 0.035
+    """Beam along the roof's NW ('nw', map x = x0) or NE ('ne', map y = y0) edge, standing above the courses."""
+    beam = material('rim', (0.12, 0.075, 0.036), noise=(10, (0.065, 0.04, 0.02)), flat_axis='XY')
+    z0 = WALL_H + FASCIA + 0.03
+    z = (z0 + ROOF_TOP + 0.05) / 2
     if edge == 'nw':
-        cube((0, -0.46, z), (1.0, 0.08, 0.07), beam, 'rim')
+        cube((0, -0.46, z), (1.0, 0.08, ROOF_TOP + 0.05 - z0), beam, 'rim')
     else:
-        cube((-0.46, 0, z), (0.08, 1.0, 0.07), beam, 'rim')
+        cube((-0.46, 0, z), (0.08, 1.0, ROOF_TOP + 0.05 - z0), beam, 'rim')
 
 
 def periodic_average(img, dx, dy):
@@ -437,6 +481,11 @@ def crop_strip(face, door=False):
             w[right:] = (np.arange(right, n) - right + 1) / max(1, n - right)
             strip = strip * (1 - w)[None, :, None] + plain * w[None, :, None]
             print(f'  doorway {face}: columns [0,{left}) and [{right},{n}) blended into the wall segment')
+        else:
+            why = 'no plain segment rendered in this run' if face not in PLAIN_STRIPS else \
+                f'plain segment {PLAIN_STRIPS[face][0].shape[1]}x{PLAIN_STRIPS[face][0].shape[0]} origin {PLAIN_STRIPS[face][1]} != doorway {strip.shape[1]}x{strip.shape[0]} origin {org}'
+            print(f'WARNING: logdoor_{face} was NOT blended into logwall_{face} ({why}); the tile-edge columns will not '
+                  f'match the plain wall and every doorway will show a seam. Render logwall_{face} in the same run.', file=sys.stderr)
         return strip, org
     return f
 
@@ -753,7 +802,16 @@ def cmd_props(args):
     os.makedirs(args.out, exist_ok=True)
     tiles_path = os.path.join(args.out, 'tiles.json')
     catalog = load_json(tiles_path, {'tiles': {}})
-    names = args.names or list(PROPS)
+    names = list(args.names or PROPS)
+    # a doorway strip borrows its tile-edge columns from the plain wall rendered earlier in the same run
+    # (crop_strip), so the plain wall of that face always goes first, whatever the order on the command line
+    for face in ('sw', 'se'):
+        door, wall = f'logdoor_{face}', f'logwall_{face}'
+        if door in names and (wall not in names or names.index(wall) > names.index(door)):
+            if wall in names:
+                names.remove(wall)
+            names.insert(names.index(door), wall)
+            print(f'{wall} is rendered before {door} so the doorway can be blended into the plain wall')
     with tempfile.TemporaryDirectory() as tmp:
         for name in names:
             builders = PROPS[name] if isinstance(PROPS[name], list) else [PROPS[name]]
@@ -764,7 +822,7 @@ def cmd_props(args):
                 if args.engine == 'CYCLES':
                     scene.cycles.samples = args.samples
                 cam = setup_camera(scene, args.size)
-                setup_lights(scene, cam)
+                setup_lights(scene, cam, **(HOUSE_LIGHTS if name in HOUSE_PROPS else {}))
                 build()
                 origin = project(scene, cam, Vector((0, 0, 0)), args.size)
                 arr = render_frame(scene, os.path.join(tmp, name + '.png'))

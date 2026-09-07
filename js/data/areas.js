@@ -95,7 +95,7 @@ function buildTown() {
   // Mara's cottage (bottom-left)
   b.rect(5, 17, 6, 5, '#'); b.set(8, 21, 'd'); b.rect(8, 22, 1, 1, ',');
   // Barracks (bottom-right)
-  b.rect(29, 16, 8, 6, '#'); b.set(30, 21, 'd'); b.rect(26, 21, 4, 1, ',').rect(26, 18, 1, 4, ',');
+  b.rect(29, 16, 8, 6, '#'); b.set(30, 21, 'd'); b.rect(26, 21, 3, 1, ',').rect(26, 18, 1, 4, ',');   // the lane stops short of the corner tile (29,21)
   // Pond
   b.circle(9.5, 27, 3.2, '~');
   // Well in the square
