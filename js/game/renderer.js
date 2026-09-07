@@ -314,7 +314,7 @@ export class Renderer {
       if (f === null) return;
       if (f.tile) {
         if (f.merged) this.blitCanvas(f.merged, cx, cy, dim);
-        else { this.blit(f.tile, cx, cy, dim); if (f.ov) this.blitCanvas(f.ov, cx, cy, dim); }
+        else { this.blit(f.tile, cx, cy, dim); if (ch === '~') this.drawWaterSheen(cx, cy, x, y, dim); if (f.ov) this.blitCanvas(f.ov, cx, cy, dim); }
         if (ch === 'd' && this.game.area.outdoor && !this.buildingAt(x, y)) this.drawDoorway(cx, cy, dim); // indoor doors: see drawDoor
         return;
       }
@@ -328,6 +328,16 @@ export class Renderer {
     if (t.stairs) { ctx.strokeStyle = shade('#9a98a0', dim); ctx.lineWidth = 2; for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(cx - TW / 2 + 12 + (i + 2) * 7, cy + i * 4); ctx.lineTo(cx + TW / 2 - 12 - (2 - i) * 7, cy + i * 4); ctx.stroke(); } }
     else if (t.bones) { ctx.strokeStyle = shade('#d8d0c0', dim); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cx - 14, cy - 4); ctx.lineTo(cx + 12, cy + 6); ctx.moveTo(cx - 8, cy + 8); ctx.lineTo(cx + 14, cy - 6); ctx.stroke(); }
     else if (t.door) { ctx.fillStyle = shade('#5a3a1a', dim); ctx.fillRect(cx - 14, cy - 34, 28, 34); }
+  }
+  /** Flare's water is painted for a sunken channel below cliffs and is near-black on flat ground: a blue-green
+   *  sheen with a drifting glint makes it read as water. Drawn under the bank overlay so the shore keeps its colour. */
+  drawWaterSheen(cx, cy, x, y, dim) {
+    const ctx = this.ctx, t = this.time;
+    ctx.fillStyle = `rgba(70,130,165,${0.28 * dim})`; // one tint for every cell, so the cell diamonds do not show
+    this.diamond(ctx, cx, cy); ctx.fill();
+    const gx = Math.sin(t * 0.7 + x * 1.3) * 12, gy = Math.cos(t * 0.5 + y * 0.8) * 5;
+    ctx.fillStyle = `rgba(200,235,255,${(0.07 + 0.06 * Math.sin(t * 2.3 + x * 1.7 + y * 0.6)) * dim})`;
+    ctx.beginPath(); ctx.ellipse(cx + gx, cy + gy, 16, 3, 0, 0, Math.PI * 2); ctx.fill();
   }
   drawDoorway(cx, cy, dim) { const ctx = this.ctx; ctx.fillStyle = shade('#3a2a1a', dim); ctx.fillRect(cx - 16, cy - 40, 32, 40); ctx.fillStyle = shade('#6a4a2a', dim); ctx.fillRect(cx - 13, cy - 36, 26, 36); }
 
@@ -461,8 +471,8 @@ export class Renderer {
         if (!tile) continue;
         // banks stay thin so water keeps most of its cell, and built paving keeps a tight edge
         const w = width * (rank === 0 ? 0.5 : 1) * (r === BLEND_RANK.floor_stone ? 0.5 : 1);
-        // a faint muddy bank shows under grass or dirt spilling over water
-        if (rank === 0 && (r === BLEND_RANK.floor_dirt || r === BLEND_RANK.floor_grass)) { const mud = this.floorTile('floor_mud', x, y); if (mud) spill(mud, dx, dy, corner, w, 0.04, 0.4); }
+        // a lighter bank of bare earth shows under grass or dirt spilling over water, so the shore has an edge
+        if (rank === 0 && (r === BLEND_RANK.floor_dirt || r === BLEND_RANK.floor_grass)) { const bank = this.floorTile('floor_dirt', x, y); if (bank) spill(bank, dx, dy, corner, w, 0.05, 0.55); }
         spill(tile, dx, dy, corner, w, 0, 1);
       }
       return ov;
