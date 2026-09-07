@@ -165,10 +165,15 @@ export class Renderer {
     }
     // objects & creatures, depth sorted
     const items = [];
+    // log houses are lit and revealed as a whole: a roof with a bright rim and a dim middle looks wrong
+    const houses = a.outdoor && this.hasLogHouse ? this.buildingIndex().list : null;
+    if (houses) for (const b of houses) { b.explored = b.tiles.some(([i, j]) => g.isExplored(i, j)); b.visible = b.tiles.some(([i, j]) => g.isVisible(i, j)); }
     for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) {
-      if (!g.isExplored(x, y)) continue;
       const ch = a.tiles[y][x]; const t = TILE[ch];
       if (!t) continue;
+      const bld = houses && (ch === '#' || ch === 'd') ? this.buildingAt(x, y) : null;
+      if (bld) { if (bld.explored) items.push({ d: x + y, x, y, tile: t, ch, bld }); continue; }
+      if (!g.isExplored(x, y)) continue;
       if (t.height && this.useArt && this.wallSet(x, y) !== 'block' && !this.wallRole(x, y)) continue; // solid interior: nothing to draw
       if (t.height || t.tree || t.bush || t.pillar || t.grave || t.altar || t.crate || t.table || t.well || t.stump || (this.useArt && (t.stairs || t.bones || ch === '.' && hash(x, y, 9) % 14 === 0))) items.push({ d: x + y, x, y, tile: t, ch });
     }
@@ -189,10 +194,19 @@ export class Renderer {
     const pl = g.player; const pd = pl.x + pl.y;
     for (const it of items) {
       if (it.tile) {
-        const vis = g.isVisible(it.x, it.y);
-        const tall = it.tile.tree || it.tile.height && this.wallIsTall(it.x, it.y);
-        const inFront = tall && it.x + it.y > pd + 0.5 && Math.abs(it.x - pl.x) < 4 && Math.abs(it.y - pl.y) < 4;
-        this.drawObject(it.x, it.y, it.tile, it.ch, dimFor(vis) * (inFront ? 0.4 : 1));
+        const vis = it.bld ? it.bld.visible : g.isVisible(it.x, it.y);
+        let inFront;
+        if (it.bld) {
+          // a house tile fades when its pieces (roof up to 5.5 rows up-screen, 96 px wide) would cover the player sprite
+          const dd = it.x + it.y + 1 - pd, dx = it.x - it.y - (pl.x - pl.y);
+          inFront = dd > 0.5 && dd < 5.5 && Math.abs(dx) < 1.45;
+        } else {
+          const tall = it.tile.tree || it.tile.height && this.wallIsTall(it.x, it.y);
+          inFront = tall && it.x + it.y > pd + 0.5 && Math.abs(it.x - pl.x) < 4 && Math.abs(it.y - pl.y) < 4;
+        }
+        const alpha = dimFor(vis) * (inFront ? 0.4 : 1);
+        if (it.bld) this.drawBuilding(it.x, it.y, it.ch, it.bld, alpha);
+        else this.drawObject(it.x, it.y, it.tile, it.ch, alpha);
       } else if (it.ent.hp !== undefined) this.drawCreature(it.ent, dt, animDt);
       else this.drawEntityObject(it.ent, g.isVisible(it.ent.x, it.ent.y) ? 1 : (a.outdoor ? 0.75 : 0.55));
     }
@@ -225,7 +239,7 @@ export class Renderer {
       // Flare lays floor only under the pieces whose lit face meets the room; the interior and the back stubs stay black
       const role = this.wallRole(x, y);
       if (!role || NO_FLOOR.has(role)) return null;
-    } else if (ch === '#') return 'floor_stone';
+    } else if (ch === '#' || (ch === 'd' && this.buildingAt(x, y))) return 'floor_stone';
     for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [-1, -1]]) {
       const c = this.game.tileChar(x + dx, y + dy);
       if (direct[c] && c !== '~') return direct[c] === 'floor_rug' ? 'floor_stone' : direct[c];
@@ -240,7 +254,7 @@ export class Renderer {
       const name = this.floorName(x, y, ch);
       if (!name) return;
       const tile = this.assets.tile(name, hash(x, y, 1));
-      if (tile) { this.blit(tile, cx, cy, dim); if (ch === 'd') this.drawDoorway(cx, cy, dim); return; }
+      if (tile) { this.blit(tile, cx, cy, dim); if (ch === 'd' && !this.buildingAt(x, y)) this.drawDoorway(cx, cy, dim); return; }
     }
     // ---- procedural fallback
     let color = t.color;
@@ -314,6 +328,60 @@ export class Renderer {
     const w = (i, j) => this.isWall(i, j);
     for (const [dx, dy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) if (w(x + dx, y) && w(x, y + dy) && w(x + dx, y + dy)) return true;
     return false;
+  }
+
+  // ---- log houses: outdoor '#' / 'd' tiles in 2x2 blocks, drawn from the Blender pieces in assets/extra
+  // (tools/blender/render_iso.py: logwall_*, logdoor_*, logpost_*, roof, roof_rim_*). Without them the
+  // tiles fall back to drawWall's logblock / wall_block cubes and the painted doorway.
+  get hasLogHouse() { const t = this.useArt && this.assets.tiles; return !!(t && t.logwall_sw && t.logwall_se && t.roof); }
+  /** Connected blocks of building tiles, one record per house: its origin seeds the roof colour and the
+   *  explored / visible flags (refreshed each frame in draw) apply to the whole house. */
+  buildingIndex() {
+    const a = this.game.area, g = this.game;
+    if (this._houses && this._houses.area === a) return this._houses;
+    const isB = (x, y) => { const c = g.tileChar(x, y); return c === '#' || c === 'd'; };
+    const thick = (x, y) => { for (const [dx, dy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) if (isB(x + dx, y) && isB(x, y + dy) && isB(x + dx, y + dy)) return true; return false; };
+    const map = new Map(), list = [];
+    for (let y = 0; y < a.height; y++) for (let x = 0; x < a.width; x++) {
+      if (map.has(y * a.width + x) || !isB(x, y) || !thick(x, y)) continue;
+      const b = { x0: x, y0: y, tiles: [], seed: hash(x, y, 21), explored: false, visible: false };
+      const stack = [[x, y]]; map.set(y * a.width + x, b);
+      while (stack.length) {
+        const [i, j] = stack.pop(); b.tiles.push([i, j]);
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const nx = i + dx, ny = j + dy;
+          if (nx < 0 || ny < 0 || nx >= a.width || ny >= a.height || map.has(ny * a.width + nx) || !isB(nx, ny) || !thick(nx, ny)) continue;
+          map.set(ny * a.width + nx, b); stack.push([nx, ny]);
+        }
+      }
+      list.push(b);
+    }
+    this._houses = { area: a, map, list };
+    return this._houses;
+  }
+  buildingAt(x, y) {
+    const a = this.game.area;
+    if (!a.outdoor || !this.hasLogHouse) return null;
+    return this.buildingIndex().map.get(y * a.width + x) || null;
+  }
+  /** One tile of a log house: a wall segment on each open SW / SE side (the doorway variant for 'd'),
+   *  posts on the outer corners, then the roof cap and the rim beams along the hidden NW / NE edges.
+   *  Every piece stays inside the tile's column, so drawing them at the tile's depth composes correctly
+   *  with the neighbours: the roof of the tile in front is drawn later than the face behind it. */
+  drawBuilding(x, y, ch, bld, dim) {
+    const [cx, cy] = this.toScreen(x + 0.5, y + 0.5);
+    const B = (i, j) => this.buildingAt(i, j) !== null;
+    const oS = !B(x, y + 1), oE = !B(x + 1, y), oW = !B(x - 1, y), oN = !B(x, y - 1);
+    const door = ch === 'd';
+    const piece = (name, seed = 0) => this.blit(this.assets.tile(name, seed), cx, cy, dim);
+    if (oS && !(door && piece('logdoor_sw'))) piece('logwall_sw');
+    if (oE && !(door && piece('logdoor_se'))) piece('logwall_se');
+    if (oS && oE) piece('logpost_s');
+    if (oS && oW) piece('logpost_w');
+    if (oE && oN) piece('logpost_e');
+    piece('roof', bld.seed);
+    if (oW) piece('roof_rim_nw');
+    if (oN) piece('roof_rim_ne');
   }
   /** Draw a tile so its image bottom sits on the diamond's bottom corner (for block tiles whose origin is at their top). */
   blitBottom(tile, cx, cy, alpha = 1) {

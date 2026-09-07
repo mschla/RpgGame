@@ -68,14 +68,18 @@ node tools/build-assets.mjs /path/to/flare-game
 `tools/blender/render_iso.py` renders models through a camera that matches the Flare projection (one Blender unit is one map tile) and writes files the game loads from `assets/extra/`. It works inside Blender (`blender -b -P tools/blender/render_iso.py -- ...`) or with the `bpy` pip package.
 
 ```
-python tools/blender/render_iso.py props                      # built-in well, log-cabin wall block, palisade, planks
+python tools/blender/render_iso.py props                      # built-in well, log-house pieces, log-cabin block, palisade, planks
+python tools/blender/render_iso.py --size 384 props --samples 256 logwall_sw logwall_se logdoor_sw logdoor_se \
+    logpost_s logpost_w logpost_e roof roof_rim_nw roof_rim_ne   # just the log-house set
 python tools/blender/render_iso.py --size 384 builtin wolf    # animated wolf; also: builtin rat
 python tools/blender/render_iso.py test-dirs                  # probe object in the 8 facing directions
 python tools/blender/render_iso.py creature --blend wolf.blend --object Wolf --name wolf \
     --actions stance=Idle,run=Run,swing=Bite,hit=Hit,die=Death --frames 8 --scale 0.8
 ```
 
-Props become tiles (the renderer uses `well`, `logblock` and `palisade` when present); creatures become animated sprite sheets in the same format as the Flare ones, listed in `assets/extra/sprites.json`. Point a monster at one with `sprite: 'wolf'` in `js/data/monsters.js`.
+Props become tiles; creatures become animated sprite sheets in the same format as the Flare ones, listed in `assets/extra/sprites.json`. Point a monster at one with `sprite: 'wolf'` in `js/data/monsters.js`.
+
+The renderer uses `well` and `palisade` when present, and assembles the town's log houses (outdoor `#` / `d` tiles that form 2x2 blocks) from per-tile pieces: `logwall_sw` / `logwall_se` (one tile of wall face each, cut from the middle of a 3-tile render and made exactly periodic so segments join without a seam), `logdoor_sw` / `logdoor_se` (the same with a doorway, used for `d` tiles), `logpost_s` / `logpost_w` / `logpost_e` (corner posts), `roof` (a shingle cap per tile; its colour variants are picked per building) and `roof_rim_nw` / `roof_rim_ne` (beams along the roof's back edges). Every piece stays inside its tile's column so the x+y depth sort composes them correctly. Without those pieces the buildings fall back to the `logblock` cube, then to the Flare wall block.
 
 ## Code layout
 

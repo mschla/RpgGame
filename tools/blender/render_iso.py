@@ -26,6 +26,7 @@ assets/extra/<name>.png, <name>.json and adds the name to assets/extra/sprites.j
 The game picks these up automatically (see js/game/assets.js).
 """
 import argparse
+import functools
 import json
 import math
 import os
@@ -123,26 +124,41 @@ def setup_lights(scene, cam):
 
 
 # ---------------------------------------------------------------- materials
-def material(name, color, roughness=0.8, noise=None, wave=None, bump=None, wave_axis='Z'):
+def material(name, color, roughness=0.8, noise=None, wave=None, bump=None, wave_axis='Z', flat_axis=''):
     """Principled material; `noise` = (scale, dark_color) mixes a noise pattern, `wave` = (scale, dark_color)
-    adds horizontal bands (logs, planks)."""
+    adds horizontal bands (logs, planks). `flat_axis` lists object axes ('X', 'Y', 'XY', ...) along which the
+    textures stay constant, so a piece that is repeated along that axis tiles without a seam."""
     m = bpy.data.materials.new(name)
     m.use_nodes = True
     nodes, links = m.node_tree.nodes, m.node_tree.links
     bsdf = nodes['Principled BSDF']
     bsdf.inputs['Roughness'].default_value = roughness
     color = (*color, 1)
+
+    def coords():
+        coord = nodes.new('ShaderNodeTexCoord')
+        if not flat_axis:
+            return coord.outputs['Object']
+        sep = nodes.new('ShaderNodeSeparateXYZ')
+        comb = nodes.new('ShaderNodeCombineXYZ')
+        links.new(coord.outputs['Object'], sep.inputs[0])
+        for ax in 'XYZ':
+            if ax in flat_axis:
+                comb.inputs[ax].default_value = 0
+            else:
+                links.new(sep.outputs[ax], comb.inputs[ax])
+        return comb.outputs[0]
+
     if noise or wave:
         mix = nodes.new('ShaderNodeMix')
         mix.data_type = 'RGBA'
         mix.inputs[6].default_value = color
         mix.inputs[7].default_value = (*(noise or wave)[1], 1)
-        coord = nodes.new('ShaderNodeTexCoord')
         if noise:
             tex = nodes.new('ShaderNodeTexNoise')
             tex.inputs['Scale'].default_value = noise[0]
             tex.inputs['Detail'].default_value = 4
-            links.new(coord.outputs['Object'], tex.inputs['Vector'])
+            links.new(coords(), tex.inputs['Vector'])
             links.new(tex.outputs['Fac'], mix.inputs[0])
         else:
             tex = nodes.new('ShaderNodeTexWave')
@@ -152,20 +168,19 @@ def material(name, color, roughness=0.8, noise=None, wave=None, bump=None, wave_
             tex.inputs['Scale'].default_value = wave[0]
             tex.inputs['Distortion'].default_value = 0.6
             tex.inputs['Detail'].default_value = 2
-            links.new(coord.outputs['Object'], tex.inputs['Vector'])
+            links.new(coords(), tex.inputs['Vector'])
             links.new(tex.outputs['Fac'], mix.inputs[0])
         links.new(mix.outputs[2], bsdf.inputs['Base Color'])
     else:
         bsdf.inputs['Base Color'].default_value = color
     if bump:
-        coord2 = nodes.new('ShaderNodeTexCoord')
         btex = nodes.new('ShaderNodeTexNoise')
         btex.inputs['Scale'].default_value = bump[0]
         btex.inputs['Detail'].default_value = 6
         btex.inputs['Roughness'].default_value = 0.7
         bnode = nodes.new('ShaderNodeBump')
         bnode.inputs['Strength'].default_value = bump[1]
-        links.new(coord2.outputs['Object'], btex.inputs['Vector'])
+        links.new(coords(), btex.inputs['Vector'])
         links.new(btex.outputs['Fac'], bnode.inputs['Height'])
         links.new(bnode.outputs['Normal'], bsdf.inputs['Normal'])
     return m
@@ -266,7 +281,177 @@ def build_planks():
     cube((0, 0.47, 0.02), (1.0, 0.07, 0.06), beam, 'beam_b')
 
 
-PROPS = {'well': build_well, 'logblock': build_logblock, 'palisade': build_palisade, 'planks': build_planks}
+# ---------------------------------------------------------------- log houses
+# Town buildings are assembled per tile by Renderer.drawBuilding from these pieces: a wall segment for
+# each open SW / SE side (a doorway variant for 'd' tiles), a corner post, a roof cap (colour variants
+# picked per building) and a rim beam along the roof's hidden NW / NE edges. Map x is Blender Y and map y
+# is Blender X, so the SW face (normal +map y) is the +X face running along Y and the SE face is the +Y
+# face running along X. Every piece stays inside its tile's 1x1 column so the renderer's x+y depth sort
+# stays valid, and everything repeated along a wall is constant along that axis so segments join seamlessly.
+LOG_RADII = [0.105, 0.095, 0.10, 0.095, 0.105, 0.10, 0.095, 0.10]
+FOUNDATION = 0.08
+WALL_H = FOUNDATION + 2 * sum(LOG_RADII)         # 1.67 tiles
+DOOR_H = FOUNDATION + 2 * sum(LOG_RADII[:6])     # the two top courses run over the doorway
+DOOR_HALF = 0.35                                 # half width of the doorway along the wall
+FASCIA = 0.10                                    # board under the roof, flush with the walls
+SHINGLE = 0.045
+ROOF_TOP = WALL_H + FASCIA + SHINGLE
+POST = 0.2
+ROOF_COLORS = [(0.19, 0.115, 0.06), (0.22, 0.095, 0.065), (0.13, 0.145, 0.09)]   # brown, weathered red, mossy
+
+
+def wall_pt(face, along, across, z):
+    """Point on a wall: `along` runs down the wall, `across` is the face-normal axis (face plane at +0.5)."""
+    return (across, along, z) if face == 'sw' else (along, across, z)
+
+
+def build_logwall(face, door=False):
+    """Three tiles of horizontal log wall (the middle one is cropped out, see crop_strip)."""
+    along = 'Y' if face == 'sw' else 'X'
+    logs = material('logs', (0.25, 0.155, 0.072), noise=(9, (0.12, 0.07, 0.03)), bump=(28, 0.25), flat_axis=along)
+    chink = material('chinking', (0.10, 0.085, 0.07), noise=(12, (0.05, 0.04, 0.035)), flat_axis=along)
+    stone = material('footing', (0.21, 0.20, 0.19), noise=(10, (0.11, 0.10, 0.095)), flat_axis=along)
+    frame = material('frame', (0.16, 0.10, 0.045), noise=(10, (0.09, 0.055, 0.025)), flat_axis='Z')
+    dark = material('interior', (0.012, 0.009, 0.006), roughness=1.0)
+    rot = (math.radians(90), 0, 0) if face == 'sw' else (0, math.radians(90), 0)
+    half = DOOR_HALF
+    spans = [(-1.5, -half), (half, 1.5)] if door else [(-1.5, 1.5)]
+    z = FOUNDATION
+    for i, r in enumerate(LOG_RADII):
+        z += r
+        for a0, a1 in (spans if z - r < DOOR_H else [(-1.5, 1.5)]):
+            cylinder(wall_pt(face, (a0 + a1) / 2, 0.5 - r, z), r, a1 - a0, logs, f'log{i}', rot=rot, verts=20)
+        z += r
+    for a0, a1 in spans:
+        cube(wall_pt(face, (a0 + a1) / 2, 0.33, WALL_H / 2), wall_pt(face, a1 - a0, 0.22, WALL_H), chink, 'chinking')
+        cube(wall_pt(face, (a0 + a1) / 2, 0.40, FOUNDATION / 2), wall_pt(face, a1 - a0, 0.20, FOUNDATION), stone, 'footing')
+    if door:
+        # the frame sits inside the chinking depth, behind the log crests, so no lit sliver of it pokes
+        # out beside the opening and the wall next to the doorway matches the plain segment
+        for s in (-1, 1):
+            cube(wall_pt(face, s * (half - 0.035), 0.39, DOOR_H / 2), wall_pt(face, 0.07, 0.10, DOOR_H), frame, 'jamb')
+        cube(wall_pt(face, 0, 0.39, DOOR_H - 0.04), wall_pt(face, 2 * half, 0.10, 0.08), frame, 'lintel')
+        cube(wall_pt(face, 0, -0.2, WALL_H / 2), wall_pt(face, 1.0, 0.05, WALL_H), dark, 'interior')
+
+
+def build_logpost(corner):
+    """Square corner post: 's' at the south corner (both faces open), 'w' / 'e' where a face ends."""
+    wood = material('post', (0.20, 0.12, 0.055), noise=(12, (0.10, 0.06, 0.028)), bump=(40, 0.2), flat_axis='Z')
+    h = 0.5 - POST / 2
+    cx, cy = {'s': (h, h), 'w': (h, -h), 'e': (-h, h)}[corner]
+    cube((cx, cy, WALL_H / 2), (POST, POST, WALL_H), wood, 'post')
+
+
+def build_roof(variant):
+    """Flat shingle roof cap for one tile on top of the fascia board; tiles seamlessly with itself."""
+    fascia = material('fascia', (0.17, 0.105, 0.05), noise=(10, (0.09, 0.055, 0.025)), flat_axis='XY')
+    cube((0, 0, WALL_H + FASCIA / 2), (1, 1, FASCIA), fascia, 'fascia')
+    base = ROOF_COLORS[variant]
+    mats = [material(f'shingle{i}', tuple(c * f for c in base), noise=(30, tuple(c * f * 0.55 for c in base)), roughness=0.9)
+            for i, f in enumerate((1.0, 0.86, 1.12, 0.94, 1.06))]
+    rows, per, gap = 8, 6, 0.012
+    w, ln = 1 / rows, 1 / per
+    for j in range(rows):
+        off = (j % 2) * ln / 2
+        x = -0.5 + (j + 0.5) * w
+        grid = [-0.5 + off + k * ln for k in range(per + 1)]
+        edges = sorted({-0.5, 0.5} | {g for g in grid if -0.5 <= g <= 0.5})
+        on_grid = lambda a: any(abs(a - g) < 1e-6 for g in grid)
+        for a0, a1 in zip(edges, edges[1:]):
+            if a1 - a0 < 1e-6:
+                continue
+            key = int(math.floor(((a0 + a1) / 2 - off + 0.5) / ln + 1e-6)) % per   # the two cut halves of a shingle match
+            b0, b1 = a0 + (gap / 2 if on_grid(a0) else 0), a1 - (gap / 2 if on_grid(a1) else 0)
+            z = WALL_H + FASCIA + SHINGLE / 2 + 0.004 * ((j * 7 + key * 3) % 3)
+            cube((x, (b0 + b1) / 2, z), (w - gap, b1 - b0, SHINGLE), mats[(j * 3 + key * 2 + (j * key) % 3) % len(mats)], f'shingle{j}_{key}')
+
+
+def build_roof_rim(edge):
+    """Low beam along the roof's NW ('nw', map x = x0) or NE ('ne', map y = y0) edge."""
+    beam = material('rim', (0.15, 0.095, 0.045), noise=(10, (0.08, 0.05, 0.025)), flat_axis='XY')
+    z = ROOF_TOP + 0.035
+    if edge == 'nw':
+        cube((0, -0.46, z), (1.0, 0.08, 0.07), beam, 'rim')
+    else:
+        cube((-0.46, 0, z), (0.08, 1.0, 0.07), beam, 'rim')
+
+
+def periodic_average(img, dx, dy):
+    """Average every pixel with its images under the screen translation (dx, dy). For a wall that is
+    constant along its length that translation maps the render onto itself (1/24 tile along the wall is
+    exactly (2, 1) screen pixels), so this removes the render noise and makes the strip exactly periodic:
+    repeated segments then match at the cut instead of showing a faint seam."""
+    h, w = img.shape[:2]
+    acc = np.zeros_like(img)
+    cnt = np.zeros((h, w, 1), dtype=np.float32)
+    for k in range(-(w // abs(dx)), w // abs(dx) + 1):
+        sx, sy = k * dx, k * dy
+        y0, y1, x0, x1 = max(0, -sy), min(h, h - sy), max(0, -sx), min(w, w - sx)
+        if y1 <= y0 or x1 <= x0:
+            continue
+        acc[y0:y1, x0:x1] += img[y0 + sy:y1 + sy, x0 + sx:x1 + sx]
+        cnt[y0:y1, x0:x1] += 1
+    return acc / cnt
+
+
+PLAIN_STRIPS = {}
+
+
+def crop_strip(face, door=False):
+    """Cut the middle tile's face out of a 3-tile wall render: the 48 screen columns between the tile's
+    left and bottom corner ('sw') or bottom and right corner ('se'), everything above the fascia's top
+    edge cleared (the roof cap is drawn over that band). Plain segments are made exactly periodic, and a
+    doorway segment borrows the plain columns outside its frame from the plain segment rendered before
+    it, so adjacent segments abut pixel-exactly."""
+    def f(arr, origin, ctx):
+        scene, cam, size = ctx
+        ox, oy = int(round(origin[0])), int(round(origin[1]))
+        x0, x1 = (ox - 48, ox) if face == 'sw' else (ox, ox + 48)
+
+        def edge_rows(z):
+            """First row at or below the face's horizontal edge at height z, per strip column."""
+            pa, pb = (Vector((0.5, -0.5, z)), Vector((0.5, 0.5, z))) if face == 'sw' else (Vector((0.5, 0.5, z)), Vector((-0.5, 0.5, z)))
+            ax, ay = project(scene, cam, pa, size)
+            bx, by = project(scene, cam, pb, size)
+            return [max(0, int(math.ceil(ay + (by - ay) * (x0 + col + 0.5 - ax) / (bx - ax) - 0.5))) for col in range(x1 - x0)]
+
+        sub = arr[:, x0:x1].copy()
+        clip = edge_rows(WALL_H + FASCIA)
+        for col in range(x1 - x0):
+            sub[:clip[col], col] = 0
+        rows = np.where((sub[:, :, 3] > 0.02).any(axis=1))[0]
+        y0, y1 = max(0, int(rows.min()) - 1), min(sub.shape[0], int(rows.max()) + 2)
+        strip, org = sub[y0:y1], (ox - x0, oy - y0)
+        if not door:
+            strip = periodic_average(strip, 2 if face == 'sw' else -2, 1)
+            PLAIN_STRIPS[face] = (strip, org)
+        elif face in PLAIN_STRIPS and PLAIN_STRIPS[face][0].shape == strip.shape and PLAIN_STRIPS[face][1] == org:
+            plain = PLAIN_STRIPS[face][0]
+            # blend from the plain segment at the tile edge into the doorway render over the columns
+            # beside the opening (they only differ by a little bounce light from the frame), so the
+            # neighbouring segments join without a step
+            n = strip.shape[1]
+            left, right = int(math.floor(n * (0.5 - DOOR_HALF))), int(math.ceil(n * (0.5 + DOOR_HALF)))
+            w = np.zeros(n, dtype=np.float32)
+            w[:left] = 1 - np.arange(left) / max(1, left)
+            w[right:] = (np.arange(right, n) - right + 1) / max(1, n - right)
+            strip = strip * (1 - w)[None, :, None] + plain * w[None, :, None]
+            print(f'  doorway {face}: columns [0,{left}) and [{right},{n}) blended into the wall segment')
+        return strip, org
+    return f
+
+
+def crop_default(arr, origin, ctx):
+    return crop(arr, origin)
+
+
+PROPS = {'well': build_well, 'logblock': build_logblock, 'palisade': build_palisade, 'planks': build_planks,
+         'logwall_sw': functools.partial(build_logwall, 'sw'), 'logwall_se': functools.partial(build_logwall, 'se'),
+         'logdoor_sw': functools.partial(build_logwall, 'sw', True), 'logdoor_se': functools.partial(build_logwall, 'se', True),
+         'logpost_s': functools.partial(build_logpost, 's'), 'logpost_w': functools.partial(build_logpost, 'w'), 'logpost_e': functools.partial(build_logpost, 'e'),
+         'roof': [functools.partial(build_roof, i) for i in range(len(ROOF_COLORS))],
+         'roof_rim_nw': functools.partial(build_roof_rim, 'nw'), 'roof_rim_ne': functools.partial(build_roof_rim, 'ne')}
+CROPS = {'logwall_sw': crop_strip('sw'), 'logwall_se': crop_strip('se'), 'logdoor_sw': crop_strip('sw', True), 'logdoor_se': crop_strip('se', True)}
 
 
 # ---------------------------------------------------------------- built-in creature: wolf
@@ -571,18 +756,24 @@ def cmd_props(args):
     names = args.names or list(PROPS)
     with tempfile.TemporaryDirectory() as tmp:
         for name in names:
-            clear_scene()
-            scene = setup_render(args.engine, args.size)
-            cam = setup_camera(scene, args.size)
-            setup_lights(scene, cam)
-            PROPS[name]()
-            origin = project(scene, cam, Vector((0, 0, 0)), args.size)
-            arr = render_frame(scene, os.path.join(tmp, name + '.png'))
-            cropped, (ox, oy) = crop(arr, origin)
-            file = name + '.png'
-            save_image(cropped, os.path.join(args.out, file))
-            catalog['tiles'][name] = [{'img': file, 'w': cropped.shape[1], 'h': cropped.shape[0], 'ox': ox, 'oy': oy, 'frames': [[0, 0, 0]]}]
-            print(f'{name}: {cropped.shape[1]}x{cropped.shape[0]} origin ({ox},{oy})')
+            builders = PROPS[name] if isinstance(PROPS[name], list) else [PROPS[name]]
+            entries = []
+            for i, build in enumerate(builders):
+                clear_scene()
+                scene = setup_render(args.engine, args.size)
+                if args.engine == 'CYCLES':
+                    scene.cycles.samples = args.samples
+                cam = setup_camera(scene, args.size)
+                setup_lights(scene, cam)
+                build()
+                origin = project(scene, cam, Vector((0, 0, 0)), args.size)
+                arr = render_frame(scene, os.path.join(tmp, name + '.png'))
+                cropped, (ox, oy) = CROPS.get(name, crop_default)(arr, origin, (scene, cam, args.size))
+                file = name + ('.png' if i == 0 else f'_{i}.png')
+                save_image(cropped, os.path.join(args.out, file))
+                entries.append({'img': file, 'w': cropped.shape[1], 'h': cropped.shape[0], 'ox': ox, 'oy': oy, 'frames': [[0, 0, 0]]})
+                print(f'{file}: {cropped.shape[1]}x{cropped.shape[0]} origin ({ox},{oy})')
+            catalog['tiles'][name] = entries
     save_json(tiles_path, catalog)
     print('wrote', tiles_path)
 
@@ -724,6 +915,7 @@ def main():
     sub = ap.add_subparsers(dest='cmd', required=True)
     p = sub.add_parser('props', help='render the built-in props')
     p.add_argument('names', nargs='*', help=f'subset of {", ".join(PROPS)}')
+    p.add_argument('--samples', type=int, default=64, help='Cycles samples per pixel')
     sub.add_parser('test-dirs', help='render a probe object in 8 directions')
     c = sub.add_parser('creature', help='render an animated model from a .blend')
     c.add_argument('--blend', required=True)
