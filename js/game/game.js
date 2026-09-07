@@ -185,7 +185,9 @@ export class Game {
     const st = E.computeStats(c);
     const [nx, ny] = c.path[0];
     const cx = nx + 0.5, cy = ny + 0.5;
-    const occ = this.creatureAt(nx, ny, c);
+    // the player walks through the companion rather than waiting for him to step aside
+    const blocker = this.creatureAt(nx, ny, c);
+    const occ = blocker && c === this.player && blocker === this.henchman ? null : blocker;
     if (occ && !(Math.floor(c.x) === nx && Math.floor(c.y) === ny)) {
       c.blockedTime = (c.blockedTime || 0) + dt;
       if (c.blockedTime > 0.4) {
@@ -738,7 +740,7 @@ export class Game {
     this.visible = new Set();
     this.updateVisibility(true);
     this.fx.clear();
-    this.renderer.snapCamera();
+    this.renderer.snapCamera(); this.renderer.hover = null;
     this.log(`You enter ${area.name}.`, 'info');
     this.ui.showAreaBanner(area.name);
     if (toId === 'crypt' && !this.flags.crypt_visited) { this.flags.crypt_visited = true; this.log('The air is cold and smells of old death. Something down here is awake.', 'info'); }
@@ -1007,7 +1009,7 @@ export class Game {
     this.visible = new Set();
     this.updateVisibility(true);
     this.fx.clear();
-    this.renderer.snapCamera();
+    this.renderer.snapCamera(); this.renderer.hover = null;
     this.log('Game loaded.', 'info');
     this.ui.showAreaBanner(this.area.name);
     this.ui.refreshAll();

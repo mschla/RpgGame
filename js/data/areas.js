@@ -95,7 +95,7 @@ function buildTown() {
   // Mara's cottage (bottom-left)
   b.rect(5, 17, 6, 5, '#'); b.set(8, 21, 'd'); b.rect(8, 22, 1, 1, ',');
   // Barracks (bottom-right)
-  b.rect(29, 16, 8, 6, '#'); b.set(30, 21, 'd'); b.rect(26, 21, 3, 1, ',').rect(26, 18, 1, 4, ',');   // the lane stops short of the corner tile (29,21)
+  b.rect(29, 16, 8, 6, '#'); b.set(30, 21, 'd'); b.rect(26, 22, 5, 1, ',').rect(26, 21, 3, 1, ',').rect(26, 18, 2, 3, ',');   // the lane ends under the doorway; the corner tile (29,21) stays
   // Pond
   b.circle(9.5, 27, 3.2, '~');
   // Well in the square
@@ -104,7 +104,7 @@ function buildTown() {
   // Gate to south
   b.set(19, 31, ','); b.set(20, 31, ','); b.set(21, 31, ',');
   b.set(18, 31, '#'); b.set(22, 31, '#'); b.set(18, 30, '#'); b.set(22, 30, '#');
-  b.scatter('T', 26, rng, ['.'], [[3, 2, 36, 12], [15, 13, 12, 8], [4, 16, 8, 8], [25, 15, 13, 8], [16, 26, 9, 6]]);
+  b.scatter('T', 26, rng, ['.'], [[3, 2, 36, 12], [15, 13, 12, 8], [4, 16, 8, 8], [25, 15, 13, 10], [16, 26, 9, 6]]);
   b.scatter('*', 10, rng, ['.'], [[3, 2, 36, 12], [15, 13, 12, 8]]);
   b.scatter('S', 4, rng, ['.'], [[3, 2, 36, 12]]);
   return {
@@ -279,7 +279,7 @@ function buildCrypt() {
   // corridor from shrine south to sanctum door
   b.rect(19, 29, 3, 5, ':'); b.set(19, 33, 'X'); b.set(21, 33, 'X');
   // sanctum
-  b.rect(12, 34, 17, 5, ':'); b.set(13, 35, 'p'); b.set(27, 35, 'p'); b.set(13, 38, 'p'); b.set(27, 38, 'p');
+  b.rect(12, 34, 16, 5, ':'); b.set(13, 35, 'p'); b.set(27, 35, 'p'); b.set(13, 38, 'p'); b.set(27, 38, 'p');
   b.set(20, 37, 'A'); b.set(16, 36, 'b'); b.set(24, 36, 'b'); b.set(18, 38, 'b');
   // treasure alcove
   b.rect(8, 35, 4, 3, ':'); b.set(9, 36, 'c');

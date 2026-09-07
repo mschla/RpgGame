@@ -1,5 +1,4 @@
 import { TILE } from '../data/areas.js';
-import { ITEMS } from '../data/items.js';
 import { MONSTERS } from '../data/monsters.js';
 import * as E from './entity.js';
 import { animFrame, animDone } from './assets.js';
@@ -173,7 +172,7 @@ export class Renderer {
     this.updateCamera(dt);
     const a = g.area;
     let fc = this.floorCaches.get(a); if (!fc) this.floorCaches.set(a, fc = new Map()); this.floorCache = fc;
-    this.ovTime = 0; // ms spent building edge overlays this frame; capped, so a big explored map never stalls
+    this.ovTime = 0; // ms spent building edge overlays this frame; capped so a big explored map never stalls a frame
     const animDt = (g.paused || g.dialogue || g.ui.modalOpen()) ? 0 : dt;
     const W = this.canvas.width, H = this.canvas.height;
     const corners = [this.toTile(0, 0), this.toTile(W, 0), this.toTile(0, H), this.toTile(W, H)];
@@ -239,9 +238,9 @@ export class Renderer {
           inFront = tall && it.x + it.y > pd + (it.tile.door ? -0.5 : 0.5) && Math.abs(it.x - pl.x) < 4 && Math.abs(it.y - pl.y) < 4;
         }
         // a faded house keeps enough body to read as a see-through roof rather than a hole
-        const alpha = dimFor(vis) * (inFront ? (it.bld ? 0.55 : 0.4) : 1);
-        if (it.bld) this.drawBuilding(it.x, it.y, it.ch, it.bld, alpha);
-        else this.drawObject(it.x, it.y, it.tile, it.ch, alpha, it.wall);
+        const fog = dimFor(vis), fade = inFront ? (it.bld ? 0.55 : 0.4) : 1;
+        if (it.bld) this.drawBuilding(it.x, it.y, it.ch, it.bld, fog * fade);
+        else this.drawObject(it.x, it.y, it.tile, it.ch, fog, it.wall, fade);
       } else if (it.ent.hp !== undefined) this.drawCreature(it.ent, dt, animDt);
       else this.drawEntityObject(it.ent, g.isVisible(it.ent.x, it.ent.y) ? 1 : (a.outdoor ? 0.75 : 0.55));
     }
@@ -261,6 +260,32 @@ export class Renderer {
     if (alpha !== 1) ctx.globalAlpha = 1;
     return true;
   }
+  /** Object art in the fog: an opaque darkened copy (cached per tile) rather than a translucent one, so overlapping
+   *  pieces (cave rock, tree crowns) do not show through each other; the in-front fade stays translucent. */
+  blitObj(tile, cx, cy, fog, fade = 1) {
+    if (!tile) return false;
+    const dark = fog < 1 && tile.frames.length === 1 ? this.darkTile(tile, fog) : null;
+    if (!dark) return this.blit(tile, cx, cy, fog * fade);
+    const ctx = this.ctx;
+    if (fade !== 1) ctx.globalAlpha = fade;
+    ctx.drawImage(dark, cx - tile.ox, cy - tile.oy);
+    if (fade !== 1) ctx.globalAlpha = 1;
+    return true;
+  }
+  darkTile(tile, fog) {
+    const k = Math.round(fog * 100);
+    const cache = tile._dark || (tile._dark = {});
+    if (cache[k] !== undefined) return cache[k];
+    let c = null;
+    try {
+      c = document.createElement('canvas'); c.width = tile.w; c.height = tile.h;
+      const x = c.getContext('2d'); const [fx, fy] = tile.frames[0];
+      x.drawImage(tile.image || this.assets.atlas, fx, fy, tile.w, tile.h, 0, 0, tile.w, tile.h);
+      x.globalCompositeOperation = 'source-atop'; x.fillStyle = `rgba(0,0,0,${1 - fog})`; x.fillRect(0, 0, tile.w, tile.h);
+    } catch (e) { c = null; }
+    cache[k] = c;
+    return c;
+  }
 
   // Which floor art a tile shows. Object tiles borrow the floor of a walkable neighbour.
   floorName(x, y, ch) {
@@ -271,8 +296,9 @@ export class Renderer {
       // Flare lays floor only under the pieces whose lit face meets the room; the interior and the back stubs stay black
       const role = this.wallRole(x, y);
       if (!role || NO_FLOOR.has(role)) return null;
-    } else if (ch === '#' && !this.buildingAt(x, y)) return 'floor_stone';
-    // log-house tiles (and object tiles) borrow the ground of a walkable neighbour: it shows through a faded roof
+    }
+    // log-house and palisade tiles (and object tiles) borrow the ground of a walkable neighbour: it shows through a
+    // faded roof or around a fence post
     for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [-1, -1]]) {
       const c = this.game.tileChar(x + dx, y + dy);
       if (direct[c] && c !== '~') return direct[c] === 'floor_rug' ? 'floor_stone' : direct[c];
@@ -326,7 +352,7 @@ export class Renderer {
       }
       this.floorCache.set(key, f);
     }
-    if (f && f.spill && this.ovTime < 12) {
+    if (f && f.spill && this.ovTime < 8) {
       const t0 = performance.now();
       // static floors get the base baked into the overlay (one drawImage per cell); animated water keeps them apart
       const still = f.tile.frames.length === 1;
@@ -350,29 +376,38 @@ export class Renderer {
     const list = this.assets.tiles[name];
     if (!list || !list.length) return null;
     const order = this.lumOrder(name, list);
-    let n = 0.6 * vnoise(x / 4.5, y / 4.5, 21) + 0.4 * vnoise(x / 1.8, y / 1.8, 22);
-    n = 0.5 + (n - 0.5) * 1.8 + (nhash(x, y, 2) - 0.5) * 0.18;
+    let n = 0.75 * vnoise(x / 6, y / 6, 21) + 0.25 * vnoise(x / 1.8, y / 1.8, 22);
+    n = 0.5 + (n - 0.5) * 1.8 + (nhash(x, y, 2) - 0.5) * 0.12;
     return list[order[Math.max(0, Math.min(list.length - 1, Math.floor(n * list.length)))]];
   }
   lumOrder(name, list) {
     let o = this._lum.get(name);
     if (o) return o;
-    const lum = list.map(t => this.tileLum(t));
+    const lum = this.tileLums(list);
     o = list.map((_, i) => i).sort((p, q) => lum[p] - lum[q]);
     this._lum.set(name, o);
     return o;
   }
-  tileLum(tile) {
+  /** Mean brightness of each tile of a set, from one readback of the set drawn side by side. */
+  tileLums(list) {
     try {
-      const c = this.scratch(tile.w, tile.h); const ctx = c.getContext('2d', { willReadFrequently: true });
+      const w = list.reduce((sum, t) => sum + t.w, 0), h = Math.max(...list.map(t => t.h));
+      const c = this.scratch(w, h); const ctx = c.getContext('2d', { willReadFrequently: true });
       ctx.clearRect(0, 0, c.width, c.height);
-      const [fx, fy] = tile.frames[0];
-      ctx.drawImage(tile.image || this.assets.atlas, fx, fy, tile.w, tile.h, 0, 0, tile.w, tile.h);
-      const d = ctx.getImageData(0, 0, tile.w, tile.h).data;
-      let sum = 0, n = 0;
-      for (let i = 0; i < d.length; i += 16) if (d[i + 3] > 200) { sum += d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11; n++; }
-      return n ? sum / n : 0;
-    } catch (e) { this.blendOk = false; return 0; }
+      let x0 = 0;
+      for (const t of list) { const [fx, fy] = t.frames[0]; ctx.drawImage(t.image || this.assets.atlas, fx, fy, t.w, t.h, x0, 0, t.w, t.h); x0 += t.w; }
+      const d = ctx.getImageData(0, 0, w, h).data;
+      const out = []; x0 = 0;
+      for (const t of list) {
+        let sum = 0, n = 0;
+        for (let py = 0; py < t.h; py += 2) for (let px = x0; px < x0 + t.w; px += 2) {
+          const i = (py * w + px) * 4;
+          if (d[i + 3] > 200) { sum += d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11; n++; }
+        }
+        out.push(n ? sum / n : 0); x0 += t.w;
+      }
+      return out;
+    } catch (e) { this.blendOk = false; return list.map(() => 0); }
   }
   scratch(w, h) {
     const c = this._scratch || (this._scratch = document.createElement('canvas'));
@@ -481,20 +516,44 @@ export class Renderer {
   wallRole(x, y) {
     const a = this.game.area;
     if (x < 0 || y < 0 || x >= a.width || y >= a.height || !this.isWall(x, y)) return null;
-    if (this.wallCache.area !== a) this.wallCache = { area: a, roles: new Map() };
-    const k = y * a.width + x;
-    let role = this.wallCache.roles.get(k);
-    if (role !== undefined) return role;
-    role = null;
-    if (this.wallClass(x, y) === 'W') {
-      role = wallPieceRole(N8.map(([dx, dy]) => this.wallClass(x + dx, y + dy)).join(''));
-      // dungeon only: the back row of the wall between two rooms one tile apart (floor straight behind it, wall in
-      // front) is the low rubble Flare also uses there instead of the tall black 67/66, which would hide the far
-      // room's floor along the wall; the cave set has no low pieces and keeps Flare's black rock
-      if (this.wallSet(x, y) === '') {
-        if (role === 'back_x' && this.wallClass(x, y - 1) === 'F') role = 'thin_x';
-        if (role === 'back_y' && this.wallClass(x - 1, y) === 'F') role = 'thin_y';
-      }
+    if (this.wallCache.area !== a) this.buildWallRoles(a);
+    return this.wallCache.roles.get(y * a.width + x) || null;
+  }
+  /** Roles of every wall tile of an area, in passes over the map in row order: Flare's rule from the neighbourhood,
+   *  then (dungeon only) the lowering of the back row and the block ends of a two-thick wall between rooms one tile
+   *  apart, then the local refinements that read their north / west neighbours, then the pieces whose black face a
+   *  low neighbour or an open doorway would expose. */
+  buildWallRoles(a) {
+    const roles = new Map(); this.wallCache = { area: a, roles };
+    const key = (x, y) => y * a.width + x;
+    const cells = [];
+    for (let y = 0; y < a.height; y++) for (let x = 0; x < a.width; x++) {
+      if (!this.isWall(x, y) || this.wallClass(x, y) !== 'W') continue;
+      cells.push([x, y]);
+      roles.set(key(x, y), wallPieceRole(N8.map(([dx, dy]) => this.wallClass(x + dx, y + dy)).join('')));
+    }
+    const at = (x, y) => (x < 0 || y < 0 || x >= a.width || y >= a.height) ? null : roles.get(key(x, y)) || null;
+    const set = (x, y, r) => roles.set(key(x, y), r);
+    const F = (x, y) => this.wallClass(x, y) === 'F';
+    const tall = (x, y) => { const r = at(x, y); return !!r && this.tallPiece(this.assets.tile(this.wallSet(x, y) + 'wall_' + r, 0)); };
+    const low = (x, y) => !!at(x, y) && !tall(x, y);
+    // dungeon only: the back row of the wall between two rooms one tile apart (floor straight behind it, wall in
+    // front) is the low rubble Flare also uses there instead of the tall black 67/66, which would hide the far room's
+    // floor along the wall, and the block pieces at the ends of such a row come down with it; the cave set has no
+    // low pieces and keeps Flare's black rock
+    for (const [x, y] of cells) {
+      if (this.wallSet(x, y) !== '') continue;
+      const r = at(x, y);
+      if (r === 'back_x' && F(x, y - 1)) set(x, y, 'thin_x');
+      else if (r === 'back_y' && F(x - 1, y)) set(x, y, 'thin_y');
+      else if (r === 'block_nw' && (F(x, y - 1) || F(x - 1, y))) set(x, y, 'tip_nw');
+      else if (r === 'block_ne' && (F(x, y - 1) || F(x + 1, y))) set(x, y, 'tip_ne');
+      else if (r === 'block_sw' && F(x, y + 1)) set(x, y, 'sw');
+      else if (r === 'block_sw' && F(x - 1, y)) set(x, y, 'tip_sw');
+      else if (r === 'back_corner' && (low(x, y - 1) || low(x - 1, y))) set(x, y, 'corner_se');
+    }
+    for (const [x, y] of cells) {
+      let role = at(x, y);
       // jambs keep the tall lit face of the door art instead of the low rubble a thin wall gets
       if (role === 'thin_x' && (this.isDoor(x - 1, y) || this.isDoor(x + 1, y))) role = 'sw';
       if (role === 'thin_y' && (this.isDoor(x, y - 1) || this.isDoor(x, y + 1))) role = 'se';
@@ -502,17 +561,24 @@ export class Renderer {
       if (role === 'ne_low' && this.isDoor(x + 1, y)) role = 'tip_ne';
       if (role === 'nw_low' && this.isDoor(x, y + 1)) role = 'tip_sw';
       // a tall corner only caps a tall wall (or a door): after ends, rubble or stubs its low twin ends the run
-      if (role === 'corner_ne' && !this.isDoor(x - 1, y) && !this.tallPiece(this.wallTile(x - 1, y))) role = 'tip_ne';
-      if (role === 'corner_sw' && !this.isDoor(x, y - 1) && !this.tallPiece(this.wallTile(x, y - 1))) role = 'tip_sw';
+      if (role === 'corner_ne' && !this.isDoor(x - 1, y) && !tall(x - 1, y)) role = 'tip_ne';
+      if (role === 'corner_sw' && !this.isDoor(x, y - 1) && !tall(x, y - 1)) role = 'tip_sw';
       // the cap stub paints the lit face of the tall corner before it (Flare: 70 only after 78, 71 only after 76), and
       // the low black continuation only follows a low corner (Flare never puts it after a tall piece)
-      if (role === 'nw_low_cap' && this.wallRole(x, y - 1) !== 'corner_ne') role = 'nw_low';
-      if (role === 'ne_low_cap' && this.wallRole(x - 1, y) !== 'corner_sw') role = 'ne_low';
-      if (role === 'sw_low' && this.wallRole(x - 1, y) !== 'tip_sw') role = 'sw';
-      if (role === 'se_low' && this.wallRole(x, y - 1) !== 'tip_ne') role = 'se';
+      if (role === 'nw_low_cap' && at(x, y - 1) !== 'corner_ne') role = 'nw_low';
+      if (role === 'ne_low_cap' && at(x - 1, y) !== 'corner_sw') role = 'ne_low';
+      if (role === 'sw_low' && at(x - 1, y) !== 'tip_sw') role = 'sw';
+      if (role === 'se_low' && at(x, y - 1) !== 'tip_ne') role = 'se';
+      set(x, y, role);
     }
-    this.wallCache.roles.set(k, role);
-    return role;
+    // a tall piece with one lit face shows its black face where the next piece along the wall is low or a doorway:
+    // the pillar lit on both faces (73) closes the run, and an open door reads as a gap between two lit jambs
+    for (const [x, y] of cells) {
+      if (this.wallSet(x, y) !== '') continue;
+      const role = at(x, y);
+      if (role === 'sw' && (this.isDoor(x + 1, y) || low(x + 1, y))) set(x, y, 'tip_se');
+      else if (role === 'se' && (this.isDoor(x, y + 1) || low(x, y + 1))) set(x, y, 'tip_se');
+    }
   }
   wallTile(x, y) { const role = this.wallRole(x, y); return role ? this.assets.tile(this.wallSet(x, y) + 'wall_' + role, hash(x, y, 5)) : null; }
   /** Only tall pieces can hide the player (so only they turn translucent in front of it) or carry a tall corner. */
@@ -520,24 +586,25 @@ export class Renderer {
 
   /** Dungeon slabs and cave rock: the piece Flare would place for this tile's neighbourhood (see wallPieceRole),
    *  looked up once per frame by draw(). */
-  drawWall(x, y, cx, cy, dim, tile) {
+  drawWall(x, y, cx, cy, fog, tile, fade = 1) {
     const set = this.wallSet(x, y);
     if (set === 'block') {
       // Blender-rendered log walls and palisades when present (tools/blender/render_iso.py), Flare brick otherwise
       const thick = this.isThick(x, y);
       const custom = this.assets.tile(thick ? 'logblock' : 'palisade', 0);
-      if (custom) { this.blit(custom, cx, cy, dim); return; }
-      const t = this.assets.tile('wall_block', 0); if (t) this.blitBottom(t, cx, cy, dim); return;
+      if (custom) { this.blitObj(custom, cx, cy, fog, fade); return; }
+      const t = this.assets.tile('wall_block', 0); if (t) this.blitBottom(t, cx, cy, fog * fade); return;
     }
     if (tile === undefined) tile = this.wallTile(x, y);
-    if (tile) this.blit(tile, cx, cy, dim);
+    if (tile) this.blitObj(tile, cx, cy, fog, fade);
   }
   /** Indoor 'd' tiles: Flare's door art at the door's own depth, so the neighbouring pieces cannot cover it
    *  (door_b faces the room across a wall along x, door_a across one along y). */
-  drawDoor(x, y, cx, cy, dim) {
-    const tile = this.assets.tile(this.isWall(x - 1, y) && this.isWall(x + 1, y) ? 'door_b' : 'door_a', 0);
-    if (tile) this.blit(tile, cx, cy, dim); else this.drawDoorway(cx, cy, dim);
+  drawDoor(x, y, cx, cy, fog, fade = 1) {
+    const tile = this.doorTile(x, y);
+    if (tile) this.blitObj(tile, cx, cy, fog, fade); else this.drawDoorway(cx, cy, fog * fade);
   }
+  doorTile(x, y) { return this.assets.tile(this.isWall(x - 1, y) && this.isWall(x + 1, y) ? 'door_b' : 'door_a', 0); }
   /** Part of a 2x2 block of wall tiles: a building rather than a fence line. */
   isThick(x, y) {
     const w = (i, j) => this.isWall(i, j);
@@ -610,13 +677,14 @@ export class Renderer {
     ctx.drawImage(this.assets.atlas, fx, fy, tile.w, tile.h, cx - tile.w / 2, cy + TH / 2 - tile.h, tile.w, tile.h);
     if (alpha !== 1) ctx.globalAlpha = 1;
   }
-  drawObject(x, y, t, ch, dim, wall) {
-    const ctx = this.ctx;
+  /** fog is the fog-of-war dimming, fade the translucency of a piece standing in front of the player. */
+  drawObject(x, y, t, ch, fog, wall, fade = 1) {
+    const ctx = this.ctx; const dim = fog * fade;
     const [cx, cy] = this.toScreen(x + 0.5, y + 0.5);
     if (this.useArt) {
       const seed = hash(x, y, 7);
-      if (t.height) { this.drawWall(x, y, cx, cy, dim, wall); return; }
-      if (t.door) { this.drawDoor(x, y, cx, cy, dim); return; }
+      if (t.height) { this.drawWall(x, y, cx, cy, fog, wall, fade); return; }
+      if (t.door) { this.drawDoor(x, y, cx, cy, fog, fade); return; }
       let name = null;
       if (t.tree) { const r = seed % 10; name = r < 6 ? 'tree' : r < 9 ? 'tree_pine' : 'tree_pale'; }
       else if (t.bush) name = 'bush';
@@ -627,11 +695,11 @@ export class Renderer {
       else if (t.altar) name = 'altar';
       else if (t.crate) name = 'crate';
       else if (t.table) name = 'table';
-      else if (t.stairs) name = 'stairs';
+      else if (t.stairs) { if (this.game.tileChar(x - 1, y) === 's' || this.game.tileChar(x, y - 1) === 's') return; name = 'stairs'; } // one staircase per run
       else if (t.bones) name = 'bones';
       else if (ch === '.') name = seed % 4 === 0 ? 'rock' : 'tuft';
       if (t.well) name = 'well';
-      if (name && this.blit(this.assets.tile(name, seed), cx, cy, dim)) return;
+      if (name && this.blitObj(this.assets.tile(name, seed), cx, cy, fog, fade)) return;
       if (t.well) { this.drawWellProcedural(cx, cy, dim); return; }
       return;
     }
@@ -700,7 +768,12 @@ export class Renderer {
         this.diamond(ctx, cx, cy, TW - 10, TH - 5); ctx.stroke();
         ctx.fillStyle = `rgba(255,230,120,${0.12 * dim})`; ctx.fill();
       }
+      // an exit on an indoor door tile is picked on the whole door art drawn over it, not only on its foot
       e._bounds = null;
+      if (this.useArt && !this.game.area.outdoor && this.game.tileChar(e.x, e.y) === 'd') {
+        const t = this.doorTile(e.x, e.y);
+        if (t) { const [cx, cy] = this.toScreen(e.x + 0.5, e.y + 0.5); e._bounds = { x: cx - t.ox, y: cy - t.oy, w: t.w, h: t.h }; }
+      }
       return;
     }
     const [cx, cy] = this.toScreen(e.x + 0.5, e.y + 0.5);

@@ -12,6 +12,7 @@ export class Assets {
       const tilesJson = await (await fetch(this.base + manifest.tiles)).json(); tick();
       this.tiles = tilesJson.tiles;
       this.atlas = await loadImage(this.base + 'tiles/' + tilesJson.atlas); tick();
+      await warm(this.atlas);
       const queue = manifest.sprites.slice();
       const worker = async () => {
         while (queue.length) {
@@ -69,6 +70,12 @@ export class Assets {
     for (const f of tile.frames) { if (ms < f[2]) return f; ms -= f[2]; }
     return tile.frames[0];
   }
+}
+
+/** Decode an image now, so the first frame that draws a new part of it does not stall. */
+async function warm(img) {
+  try { if (img.decode) await img.decode(); } catch (e) { /* fall back to lazy decoding */ }
+  try { const c = document.createElement('canvas'); c.width = 8; c.height = 8; c.getContext('2d').drawImage(img, 0, 0, 8, 8); } catch (e) { /* ignore */ }
 }
 
 function loadImage(src) {
