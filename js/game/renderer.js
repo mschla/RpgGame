@@ -22,6 +22,44 @@ function shade(hex, f) {
 }
 function hash(x, y, salt = 0) { let h = (x * 374761393 + y * 668265263 + salt * 982451653) | 0; h = (h ^ (h >>> 13)) * 1274126177; return Math.abs(h ^ (h >>> 16)); }
 
+// ---------------------------------------------------------------- wall pieces
+// Which Flare wall piece a dungeon / cave wall tile shows, from its 8 neighbours in map order N NE E SE S SW W NW
+// (N is -y, E is +x). Each neighbour is 'W' (a wall piece), 'F' (floor) or 'V' (solid interior, never drawn).
+// The rules were read off Flare's own maps: the visible faces of a block are SE (+x) and SW (+y), so a wall with
+// the room in front of it is a tall piece with a lit face, while a wall with the room behind it is a low black stub
+// that cannot hide the floor. Corners, T-junctions, wall ends and 2x2 blocks get their own pieces (see the WALLS
+// table in tools/build-assets.mjs for the tile ids).
+const N8 = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]];
+const NO_FLOOR = new Set(['nw_low', 'ne_low', 'nw_low_cap', 'ne_low_cap', 'corner_ne', 'corner_sw', 'corner_se', 'back_y', 'back_x', 'back_corner']);
+function wallPieceRole(sig) {
+  const [n, ne, e, se, s, sw, w, nw] = sig;
+  const W = (c) => c === 'W', F = (c) => c === 'F';
+  const mask = (W(n) ? 8 : 0) | (W(e) ? 4 : 0) | (W(s) ? 2 : 0) | (W(w) ? 1 : 0);
+  const openE = F(e) || !W(e) && (F(ne) || F(se)), openW = F(w) || !W(w) && (F(nw) || F(sw));
+  const openS = F(s) || !W(s) && (F(se) || F(sw)), openN = F(n) || !W(n) && (F(ne) || F(nw));
+  switch (mask) {
+    case 10: // wall along y
+      if (F(e) && F(w)) return 'thin_y';
+      if (openE && !openW) return W(nw) ? 'se_low' : 'se';
+      return openW ? (W(nw) ? 'nw_low_cap' : 'nw_low') : 'back_y';
+    case 5: // wall along x
+      if (F(n) && F(s)) return 'thin_x';
+      if (openS && !openN) return W(nw) ? 'sw_low' : 'sw';
+      return openN ? (W(nw) ? 'ne_low_cap' : 'ne_low') : 'back_x';
+    case 6: return F(se) ? 'corner_nw' : W(se) ? 'block_nw' : 'tip_nw';   // E+S
+    case 3: return F(sw) ? 'corner_ne' : W(sw) ? 'block_ne' : 'tip_ne';   // S+W
+    case 12: return F(ne) ? 'corner_sw' : W(ne) ? 'block_sw' : 'tip_sw';  // N+E
+    case 9: return F(nw) ? 'corner_se' : 'tip_se';                        // N+W
+    case 7: return openN ? 'back_x' : F(sw) ? 'corner_ne' : F(se) ? 'corner_nw' : 'back_x';   // E+S+W
+    case 14: return openW ? 'back_y' : F(se) ? 'corner_nw' : F(ne) ? 'corner_sw' : 'back_y';  // N+E+S
+    case 11: return openE ? 'se' : F(sw) ? 'corner_ne' : F(nw) ? 'corner_se' : 'back_y';      // N+S+W
+    case 13: return openS ? 'sw' : F(ne) ? 'corner_sw' : F(nw) ? 'corner_se' : 'back_x';      // N+E+W
+    case 15: return F(nw) ? 'back_corner' : F(se) ? 'corner_nw' : F(sw) ? 'back_x' : 'back_y';
+    case 8: return 'end_n'; case 4: return 'end_e'; case 2: return 'end_s'; case 1: return 'end_w';
+    default: return 'lone';
+  }
+}
+
 // Animation fallbacks when a sheet lacks a clip
 const ANIM_FALLBACK = { run: 'stance', hit: 'stance', swing: 'stance', shoot: 'swing', cast: 'stance', die: 'stance', stance: 'stance' };
 
@@ -54,6 +92,7 @@ export class Renderer {
     this.fx = new FX();
     this.game = null; this.hover = null; this.mouse = { x: -1, y: -1 };
     this.time = 0;
+    this.wallCache = { area: null, roles: null };
     this.resize();
     window.addEventListener('resize', () => this.resize());
   }
@@ -130,9 +169,8 @@ export class Renderer {
       if (!g.isExplored(x, y)) continue;
       const ch = a.tiles[y][x]; const t = TILE[ch];
       if (!t) continue;
+      if (t.height && this.useArt && this.wallSet(x, y) !== 'block' && !this.wallRole(x, y)) continue; // solid interior: nothing to draw
       if (t.height || t.tree || t.bush || t.pillar || t.grave || t.altar || t.crate || t.table || t.well || t.stump || (this.useArt && (t.stairs || t.bones || ch === '.' && hash(x, y, 9) % 14 === 0))) items.push({ d: x + y, x, y, tile: t, ch });
-      // black "back" slabs of walls are drawn on the floor tile in front of them
-      if (this.useArt && !t.height && (this.hasBack(x + 1, y) || this.hasBack(x, y + 1))) items.push({ d: x + y + 0.4, x, y, wallBack: true });
     }
     for (const e of a.entities) {
       const isCreature = e.hp !== undefined;
@@ -150,15 +188,9 @@ export class Renderer {
     items.sort((p, q) => p.d - q.d);
     const pl = g.player; const pd = pl.x + pl.y;
     for (const it of items) {
-      if (it.wallBack) {
-        const near = it.x + it.y >= pd - 0.5 && Math.abs(it.x - pl.x) < 4 && Math.abs(it.y - pl.y) < 4;
-        const [cx, cy] = this.toScreen(it.x + 0.5, it.y + 0.5);
-        this.drawWallBack(it.x, it.y, cx, cy, dimFor(g.isVisible(it.x, it.y)) * (near ? 0.35 : 1));
-        continue;
-      }
       if (it.tile) {
         const vis = g.isVisible(it.x, it.y);
-        const tall = it.tile.height || it.tile.tree;
+        const tall = it.tile.tree || it.tile.height && this.wallIsTall(it.x, it.y);
         const inFront = tall && it.x + it.y > pd + 0.5 && Math.abs(it.x - pl.x) < 4 && Math.abs(it.y - pl.y) < 4;
         this.drawObject(it.x, it.y, it.tile, it.ch, dimFor(vis) * (inFront ? 0.4 : 1));
       } else if (it.ent.hp !== undefined) this.drawCreature(it.ent, dt, animDt);
@@ -189,8 +221,11 @@ export class Renderer {
       if (ch === '.' && hash(x, y, 3) % 5 === 0) return 'floor_grass_alt';
       return direct[ch];
     }
-    if (ch === 'X') return null;
-    if (ch === '#') return 'floor_stone';
+    if (ch === 'X' || ch === '#' && !a.outdoor) {
+      // Flare lays floor only under the pieces whose lit face meets the room; the interior and the back stubs stay black
+      const role = this.wallRole(x, y);
+      if (!role || NO_FLOOR.has(role)) return null;
+    } else if (ch === '#') return 'floor_stone';
     for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0], [1, 1], [-1, -1]]) {
       const c = this.game.tileChar(x + dx, y + dy);
       if (direct[c] && c !== '~') return direct[c] === 'floor_rug' ? 'floor_stone' : direct[c];
@@ -219,7 +254,8 @@ export class Renderer {
   }
   drawDoorway(cx, cy, dim) { const ctx = this.ctx; ctx.fillStyle = shade('#3a2a1a', dim); ctx.fillRect(cx - 16, cy - 40, 32, 40); ctx.fillStyle = shade('#6a4a2a', dim); ctx.fillRect(cx - 13, cy - 36, 26, 36); }
 
-  isWall(x, y) { const c = this.game.tileChar(x, y); return c === '#' || c === 'X'; }
+  /** Rock tiles; outside the map counts as rock. */
+  isWall(x, y) { const a = this.game.area; if (x < 0 || y < 0 || x >= a.width || y >= a.height) return true; const c = a.tiles[y][x]; return c === '#' || c === 'X'; }
   /** Wall style prefix for a wall tile: dungeon slabs indoors, cave rock for outdoor 'X', brick blocks for outdoor '#'. */
   wallSet(x, y) {
     const c = this.game.tileChar(x, y);
@@ -227,9 +263,40 @@ export class Renderer {
     if (!this.game.area.outdoor) return '';
     return c === 'X' ? 'cave_' : 'block';
   }
-  hasBack(x, y) { const w = this.wallSet(x, y); return w !== null && w !== 'block'; }
+  isDoor(x, y) { return this.game.tileChar(x, y) === 'd' || this.game.area.entities.some(e => e.type === 'door' && e.x === x && e.y === y); }
+  /** Neighbour class for the wall rules: 'W' wall piece, 'F' floor, 'V' solid interior. Doors count as wall so the jambs continue the wall. */
+  wallClass(x, y) {
+    const a = this.game.area;
+    if (x < 0 || y < 0 || x >= a.width || y >= a.height) return 'V'; // outside the map is void
+    if (!this.isWall(x, y)) return this.isDoor(x, y) ? 'W' : 'F';
+    for (const [dx, dy] of N8) if (!this.isWall(x + dx, y + dy) && !this.isDoor(x + dx, y + dy)) return 'W';
+    return 'V';
+  }
+  /** Piece role of a dungeon / cave wall tile (null for the solid interior), cached per area. */
+  wallRole(x, y) {
+    const a = this.game.area;
+    if (this.wallCache.area !== a) this.wallCache = { area: a, roles: new Map() };
+    const k = y * a.width + x;
+    let role = this.wallCache.roles.get(k);
+    if (role !== undefined) return role;
+    role = null;
+    if (this.wallClass(x, y) === 'W') {
+      role = wallPieceRole(N8.map(([dx, dy]) => this.wallClass(x + dx, y + dy)).join(''));
+      // jambs keep the tall lit face of the door art instead of the low rubble a thin wall gets
+      if (role === 'thin_x' && (this.isDoor(x - 1, y) || this.isDoor(x + 1, y))) role = 'sw';
+      if (role === 'thin_y' && (this.isDoor(x, y - 1) || this.isDoor(x, y + 1))) role = 'se';
+      // the low black continuation only follows a low corner (Flare never puts it after a tall piece)
+      if (role === 'sw_low' && this.wallRole(x - 1, y) !== 'tip_sw') role = 'sw';
+      if (role === 'se_low' && this.wallRole(x, y - 1) !== 'tip_ne') role = 'se';
+    }
+    this.wallCache.roles.set(k, role);
+    return role;
+  }
+  wallTile(x, y) { const role = this.wallRole(x, y); return role ? this.assets.tile(this.wallSet(x, y) + 'wall_' + role, hash(x, y, 5)) : null; }
+  /** Only tall pieces can hide the player, so only they turn translucent in front of the player. */
+  wallIsTall(x, y) { if (!this.useArt || this.wallSet(x, y) === 'block') return true; const t = this.wallTile(x, y); return !!t && t.oy > 100; }
 
-  /** Lit wall faces sit on a rock tile's near (SE / SW) edges, facing the room in front of them. */
+  /** Dungeon slabs and cave rock: the piece Flare would place for this tile's neighbourhood (see wallPieceRole). */
   drawWall(x, y, cx, cy, dim) {
     const set = this.wallSet(x, y);
     if (set === 'block') {
@@ -239,22 +306,8 @@ export class Renderer {
       if (custom) { this.blit(custom, cx, cy, dim); return; }
       const t = this.assets.tile('wall_block', 0); if (t) this.blitBottom(t, cx, cy, dim); return;
     }
-    const open = (i, j) => !this.isWall(i, j);
-    const seed = hash(x, y, 5);
-    const fSE = open(x + 1, y), fSW = open(x, y + 1);
-    let piece = null;
-    if (fSE && fSW) piece = 'wall_corner_front';
-    else if (fSE) piece = 'wall_b';
-    else if (fSW) piece = 'wall_a';
-    else if (open(x + 1, y + 1)) piece = 'wall_corner_front';
-    if (piece) this.blit(this.assets.tile(set + piece, seed), cx, cy, dim);
-  }
-  /** Dark back sides of walls, drawn on the floor tile that lies in front of a wall (its SE / SW edges). */
-  drawWallBack(x, y, cx, cy, dim) {
-    const rSE = this.hasBack(x + 1, y), rSW = this.hasBack(x, y + 1);
-    const set = this.wallSet(rSE ? x + 1 : x, rSE ? y : y + 1) || '';
-    const piece = rSE && rSW ? 'wall_corner_back' : rSE ? 'wall_back_a' : 'wall_back_b';
-    this.blit(this.assets.tile(set + piece, hash(x, y, 6)), cx, cy, dim);
+    const tile = this.wallTile(x, y);
+    if (tile) this.blit(tile, cx, cy, dim);
   }
   /** Part of a 2x2 block of wall tiles: a building rather than a fence line. */
   isThick(x, y) {

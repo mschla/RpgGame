@@ -53,10 +53,6 @@ const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
 const TILES = {
   floor_stone: ['dungeon', [16, 17, 18, 19, ...range(36, 47)]], floor_tile: ['dungeon', range(32, 35)], wall_block: ['dungeon', [48]],
   floor_rug: ['dungeon', [61]],
-  wall_a: ['dungeon', [64, 68]], wall_b: ['dungeon', [65, 69]], wall_back_a: ['dungeon', [66]], wall_back_b: ['dungeon', [67]],
-  wall_corner_front: ['dungeon', [77]], wall_corner_back: ['dungeon', [79]],
-  cave_wall_a: ['cave', [64, 68]], cave_wall_b: ['cave', [65, 69]], cave_wall_back_a: ['cave', [66]], cave_wall_back_b: ['cave', [67]],
-  cave_wall_corner_front: ['cave', [72, 76]], cave_wall_corner_back: ['cave', [74]],
   statue: ['dungeon', range(128, 131)], throne: ['dungeon', [132, 133]], altar: ['dungeon', [134, 135]], table: ['dungeon', [136, 137]],
   crate: ['dungeon', [146, 147, 160, 161, 162, 163]], lectern: ['dungeon', [148, 149]], brazier: ['dungeon', [167]],
   bones: ['dungeon', range(176, 183)], sarcophagus: ['dungeon', [199, 194]], bed: ['dungeon', [203]],
@@ -69,6 +65,23 @@ const TILES = {
   stump: ['grassland', [136, 137]], grave: ['grassland', [140, 141]], cross: ['grassland', [142, 143]], fence: ['grassland', range(104, 111)], campfire: ['grassland', [102]], logs: ['grassland', [100, 101]],
   water: ['water', range(180, 190)],
 };
+// Wall pieces by role, [dungeon ids, cave ids], the way Flare's own maps use them (see wallPieceRole in
+// js/game/renderer.js). The two visible faces of a block are SE (+x) and SW (+y): a wall gets a tall piece with a lit
+// face when the room is in front of it and a low black stub when the room is behind it, so walls never hide the floor
+// of the room they enclose. The cave set has no low stubs; Flare uses tall black rock there.
+const WALLS = {
+  se: [[64, 68], [64, 68]], sw: [[65, 69], [65, 69]],                     // straight wall, lit SE / SW face toward the room
+  se_low: [[80], [64, 68]], sw_low: [[81], [65, 69]],                       // same, but the low black piece that continues a low corner
+  nw_low: [[82], [66, 70]], ne_low: [[83], [67, 71]],                       // room behind (NW / NE side): low black stubs
+  nw_low_cap: [[70], [66, 70]], ne_low_cap: [[71], [67, 71]],               // first stub after a tall corner: paints the corner's face lit
+  corner_nw: [[77], [72, 76]], corner_ne: [[78], [73, 77]], corner_sw: [[76], [75, 79]], corner_se: [[95], [74, 78]], // room corners
+  tip_se: [[73], [80, 84]], tip_nw: [[91], [82, 86]], tip_ne: [[88], [83, 87]], tip_sw: [[90], [81, 85]], // convex tips of wall masses
+  block_nw: [[75], [82, 86]], block_ne: [[72], [83, 87]], block_sw: [[74], [81, 85]],                    // parts of 2x2 blocks (with tip_se)
+  back_y: [[66], [66, 70]], back_x: [[67], [67, 71]], back_corner: [[79], [74, 78]],                   // tall black: more wall behind
+  thin_y: [[122], [64, 68]], thin_x: [[123], [65, 69]],                                                // floor on both sides: low rubble
+  end_n: [[119], [81, 85]], end_e: [[120], [83, 87]], end_s: [[121], [80, 84]], end_w: [[118], [82, 86]], lone: [[110, 111], [80, 84]],
+};
+for (const [role, [d, c]] of Object.entries(WALLS)) { TILES['wall_' + role] = ['dungeon', d]; TILES['cave_wall_' + role] = ['cave', c]; }
 if (process.env.DEBUG_TILES) {
   for (const id of range(16, 63)) TILES[`dbg_dungeon_${id}`] = ['dungeon', [id]];
   for (const id of range(200, 300)) TILES[`dbg_grass_${id}`] = ['grassland', [id]];
