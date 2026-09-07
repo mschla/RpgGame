@@ -42,12 +42,13 @@ const SPRITES = {
   wandering_trader: `${FC}/animations/npcs/wandering_trader.txt`,
 };
 const AVATAR_LAYERS = ['default_chest', 'default_legs', 'default_feet', 'default_hands', 'cloth_shirt', 'cloth_pants', 'leather_chest', 'leather_pants', 'leather_boots',
-  'chain_cuirass', 'chain_greaves', 'plate_cuirass', 'plate_greaves', 'mage_vest', 'mage_skirt', 'mage_hood',
+  'chain_cuirass', 'chain_greaves', 'plate_cuirass', 'plate_greaves', 'mage_vest', 'mage_skirt', 'mage_hood', 'leather_hood', 'chain_coif', 'plate_helm',
   'dagger', 'shortsword', 'longsword', 'hand_axe', 'battle_axe', 'greatsword', 'mace', 'staff', 'greatstaff', 'longbow', 'shortbow', 'buckler', 'kite_shield'];
 for (const g of ['male', 'female']) {
   for (const l of AVATAR_LAYERS) SPRITES[`${g}/${l}`] = `${FC}/animations/avatar/${g}/${l}.txt`;
   SPRITES[`${g}/head`] = `${FC}/animations/avatar/${g}/${g === 'male' ? 'head_short' : 'head_long'}.txt`;
 }
+SPRITES['male/head_bald'] = `${FC}/animations/avatar/male/head_bald.txt`;
 
 const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
 const TILES = {

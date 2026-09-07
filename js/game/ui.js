@@ -68,6 +68,14 @@ export class UI {
   refreshAll() { this.refreshHud(); this.refreshQuickbar(); if (this.panelName) this.renderPanel(this.panelName); if (this.modal === 'shop') this.renderShop(); if (this.modal === 'loot') this.renderLoot(); }
 
   // ---------------------------------------------------------------- HUD
+  /** Portrait box: the character's own sprite when art is loaded, the class icon otherwise. Cached by look. */
+  setPortrait(box, c, fallbackIcon) {
+    const key = [c.race, c.gender, c.cls, c.equipment.armor, c.equipment.weapon, c.equipment.shield, c.color].join('|');
+    if (box.dataset.key === key) return;
+    box.dataset.key = key; box.style.background = c.color; box.innerHTML = '';
+    const canvas = this.game && this.game.renderer ? this.game.renderer.portrait(c) : null;
+    if (canvas) { canvas.className = 'portrait-img'; box.appendChild(canvas); } else box.innerHTML = icon(fallbackIcon, null, 'big');
+  }
   refreshHud() {
     const g = this.game; if (!g || !g.player) return;
     const p = g.player;
@@ -80,7 +88,7 @@ export class UI {
     const f = p.level >= MAX_LEVEL ? 1 : (p.xp - cur) / (next - cur);
     $('hud-xp').style.width = `${Math.min(100, f * 100)}%`;
     $('hud-xp-text').textContent = p.level >= MAX_LEVEL ? `${p.xp} XP (max level)` : `${p.xp} / ${next} XP${E.canLevelUp(p) ? ' — LEVEL UP!' : ''}`;
-    const port = $('hud-portrait'); port.style.background = p.color; port.innerHTML = icon(p.cls, null, 'big');
+    this.setPortrait($('hud-portrait'), p, p.cls);
     const h = g.henchman;
     const hc = $('hud-hench');
     if (h) {
@@ -89,7 +97,7 @@ export class UI {
       $('hench-name').textContent = `${h.name} (Lv ${h.level} Ranger)${h.unconscious ? ' — down' : ''}`;
       $('hench-hp').style.width = `${Math.max(0, h.hp / hm * 100)}%`;
       $('hench-hp-text').textContent = `${h.hp} / ${hm}`;
-      const hp = $('hench-portrait'); hp.style.background = h.color; hp.innerHTML = icon('ranger', null, 'big');
+      this.setPortrait($('hench-portrait'), h, 'ranger');
     } else hc.classList.add('hidden');
     const eff = $('hud-effects'); eff.innerHTML = '';
     for (const e of p.effects) eff.appendChild(el('span', 'effect-chip' + (e.harmful || e.held || e.dot ? ' bad' : ''), `${esc(e.name)} (${e.remaining})`));
@@ -428,11 +436,11 @@ export class UI {
 // ==================================================================== Character creation
 export class CharacterCreator {
   constructor(onStart, onBack) {
-    this.onStart = onStart; this.onBack = onBack;
+    this.onStart = onStart; this.onBack = onBack; this.renderer = null;
     this.race = 'human'; this.cls = 'fighter'; this.gender = 'm';
     this.abilities = { STR: 8, DEX: 8, CON: 8, INT: 8, WIS: 8, CHA: 8 };
     this.skills = {};
-    for (const c of document.querySelectorAll('#cc-gender .card')) c.onclick = () => { this.gender = c.dataset.g; for (const d of document.querySelectorAll('#cc-gender .card')) d.classList.toggle('selected', d === c); };
+    for (const c of document.querySelectorAll('#cc-gender .card')) c.onclick = () => { this.gender = c.dataset.g; for (const d of document.querySelectorAll('#cc-gender .card')) d.classList.toggle('selected', d === c); this.updatePreview(); };
     $('cc-back').onclick = () => onBack();
     $('cc-start').onclick = () => this.start();
     $('cc-name').oninput = () => this.renderSummary();
@@ -443,6 +451,21 @@ export class CharacterCreator {
     this.abilities = { STR: 14, DEX: 12, CON: 14, INT: 10, WIS: 10, CHA: 10 };
     this.skills = {};
     this.render();
+    this.animatePreview();
+  }
+  /** The character as it will look in the game, on the preview canvas; rebuilt when race, class or gender change. */
+  updatePreview() {
+    this.previewEnt = E.createPlayer({ name: 'Hero', race: this.race, cls: this.cls, abilities: this.abilities, skills: this.skills, color: $('cc-color').value, gender: this.gender });
+  }
+  animatePreview() {
+    if (this.previewLoop) return;
+    const canvas = $('cc-preview');
+    const step = (now) => {
+      if ($('create').classList.contains('hidden')) { this.previewLoop = null; return; }
+      if (this.renderer && this.previewEnt) this.renderer.previewAvatar(canvas, this.previewEnt, now / 1000);
+      this.previewLoop = requestAnimationFrame(step);
+    };
+    this.previewLoop = requestAnimationFrame(step);
   }
   static pointCost(v) { if (v <= 14) return v - 8; if (v <= 16) return 6 + (v - 14) * 2; return 10 + (v - 16) * 3; }
   pointsUsed() { return E.ABILITIES.reduce((t, a) => t + CharacterCreator.pointCost(this.abilities[a]), 0); }
@@ -478,6 +501,7 @@ export class CharacterCreator {
       tr.appendChild(tdm); tr.appendChild(tdp); st.appendChild(tr);
     }
     this.renderSummary();
+    this.updatePreview();
     $('cc-desc').innerHTML = `<p><b>${rd.name}.</b> ${esc(rd.desc)}</p><ul>${rd.traits.map(t => `<li>${esc(t)}</li>`).join('')}</ul><p><b>${cd.name}.</b> ${esc(cd.desc)}</p><ul>${cd.features.map(f => `<li>Lv ${f.level}: ${f.name} — ${esc(f.desc)}</li>`).join('')}</ul><p class="muted">Starting gear: ${cd.startingItems.map(i => ITEMS[i].name).join(', ')}, ${cd.startingGold} gold.</p>`;
   }
   applyRecommended() {

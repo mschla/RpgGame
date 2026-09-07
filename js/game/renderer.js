@@ -1,5 +1,6 @@
 import { TILE } from '../data/areas.js';
 import { MONSTERS } from '../data/monsters.js';
+import { RACES } from '../data/races.js';
 import * as E from './entity.js';
 import { animFrame, animDone } from './assets.js';
 import { LAYER_ORDER, avatarFromEquipment, avatarFromSpec } from './avatar.js';
@@ -81,6 +82,48 @@ function wallPieceRole(sig) {
   }
 }
 
+function union(a, b) { const x0 = Math.min(a.x, b.x), y0 = Math.min(a.y, b.y); return { x: x0, y: y0, w: Math.max(a.x + a.w, b.x + b.w) - x0, h: Math.max(a.y + a.h, b.y + b.h) - y0 }; }
+
+// ---------------------------------------------------------------- race recolouring of the avatar sheets
+function rgbToHsl(r, g, b) {
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2;
+  if (mx === mn) return [0, 0, l];
+  const d = mx - mn, s = d / (1 - Math.abs(2 * l - 1));
+  let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  h *= 60; if (h < 0) h += 360;
+  return [h, s, l];
+}
+function hslToRgb(h, s, l) {
+  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2;
+  const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  return [(r + m) * 255, (g + m) * 255, (b + m) * 255];
+}
+/** A copy of a Flare avatar sheet with the skin (and, on head sheets, the hair) recoloured for a race. Skin is the
+ *  peach range of the human sheets, hair the dark pixels of a head sheet; null when the pixels cannot be read. */
+function tintSheet(sheet, look, withHair) {
+  try {
+    const c = document.createElement('canvas'); c.width = sheet.img.width; c.height = sheet.img.height;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(sheet.img, 0, 0);
+    const img = ctx.getImageData(0, 0, c.width, c.height), d = img.data;
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 8) continue;
+      let [h, s, l] = rgbToHsl(d[i] / 255, d[i + 1] / 255, d[i + 2] / 255);
+      const warm = h >= 5 && h <= 45;
+      if (look.skin && warm && s >= 0.18 && l >= 0.22 && l <= 0.75) {
+        h = (h + look.skin.h + 360) % 360; s = clamp(s * look.skin.s, 0, 1); l = clamp(l * look.skin.l, 0, 1);
+      } else if (withHair && look.hair && l < 0.22 && (warm || s < 0.25)) {
+        h = look.hair.h; s = look.hair.s; l = clamp(look.hair.l * l / 0.12, 0.03, 0.92);
+      } else continue;
+      const [r, g, b] = hslToRgb(h, s, l);
+      d[i] = r; d[i + 1] = g; d[i + 2] = b;
+    }
+    ctx.putImageData(img, 0, 0);
+    return { ...sheet, img: c };
+  } catch (e) { return null; }
+}
+
 // Animation fallbacks when a sheet lacks a clip
 const ANIM_FALLBACK = { run: 'stance', hit: 'stance', swing: 'stance', shoot: 'swing', cast: 'stance', die: 'stance', stance: 'stance' };
 
@@ -115,6 +158,7 @@ export class Renderer {
     this.time = 0;
     this.wallCache = { area: null, roles: null };
     // per-cell floor choices and edge overlays, one cache per area (areas are only replaced by newGame / load)
+    this._raceSheets = new Map();
     this.floorCaches = new WeakMap(); this.floorCache = null; this.ovTime = 0; this._lum = new Map(); this.blendOk = true;
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -877,14 +921,69 @@ export class Renderer {
     if (e.kind === 'monster') { const t = MONSTERS[e.tid]; sheet = t.sprite; avatar = t.avatar ? avatarFromSpec(t.avatar) : null; scale = t.spriteScale || 1; }
     else if (e.kind === 'npc') { sheet = e.sprite; avatar = e.avatar ? avatarFromSpec(e.avatar) : null; }
     else avatar = avatarFromEquipment(e);
-    if (sheet && this.assets.sprite(sheet)) return { sheets: [sheet], scale, order: null };
+    if (sheet && this.assets.sprite(sheet)) return { sheets: [sheet], scale, sx: scale, sy: scale, order: null };
     if (avatar) {
       const g = avatar.gender;
       const byLayer = {};
       for (const [layer, name] of Object.entries(avatar.layers)) if (name && this.assets.sprite(`${g}_${name}`)) byLayer[layer] = `${g}_${name}`;
-      if (Object.keys(byLayer).length) return { sheets: null, byLayer, scale, order: true };
+      // the player's race reshapes and recolours the human sheets (RACES[..].look)
+      const look = e.race && RACES[e.race] ? RACES[e.race].look : null;
+      if (Object.keys(byLayer).length) return { sheets: null, byLayer, scale, sx: (look ? look.sx : 1) * scale, sy: (look ? look.sy : 1) * scale, look, race: e.race, order: true };
     }
     return null;
+  }
+  /** The sheet of a layer, recoloured for a race when the layer shows skin or hair; cached per race and sheet. */
+  raceSheet(name, desc) {
+    const base = this.assets.sprite(name);
+    if (!base || !desc.look || !(desc.look.skin || desc.look.hair)) return base;
+    const m = /_(head|head_bald|default_hands|default_feet|default_chest|default_legs)$/.exec(name);
+    if (!m) return base;
+    const key = desc.race + ':' + name;
+    let t = this._raceSheets.get(key);
+    if (t === undefined) { t = tintSheet(base, desc.look, m[1].startsWith('head')); this._raceSheets.set(key, t); }
+    return t || base;
+  }
+  /** Draw a creature's composed sprite (stance animation, facing dir) at (cx, cy) on any context: previews and
+   *  portraits. Returns the drawn bounds. */
+  drawAvatarAt(ctx, e, dir, cx, cy, t, k = 1) {
+    const desc = this.spriteDesc(e);
+    if (!desc) return null;
+    const sx = desc.sx * k, sy = desc.sy * k;
+    const names = desc.sheets || LAYER_ORDER[dir].map(l => desc.byLayer[l]).filter(Boolean);
+    let bounds = null;
+    for (const name of names) {
+      const sd = this.raceSheet(name, desc);
+      if (!sd) continue;
+      const clip = sd.anims.stance || Object.values(sd.anims)[0];
+      const rects = clip.rects[dir] || clip.rects[0];
+      const r = rects && rects[Math.min(animFrame(clip, t), rects.length - 1)];
+      if (!r) continue;
+      const [fx, fy, fw, fh, rox, roy] = r;
+      const dx = cx - rox * sx, dy = cy - roy * sy;
+      ctx.drawImage(sd.img, fx, fy, fw, fh, dx, dy, fw * sx, fh * sy);
+      bounds = bounds ? union(bounds, { x: dx, y: dy, w: fw * sx, h: fh * sy }) : { x: dx, y: dy, w: fw * sx, h: fh * sy };
+    }
+    return bounds;
+  }
+  /** Animated full-figure preview of a character on a canvas (character creation). */
+  previewAvatar(canvas, e, t) {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(canvas.width / 2, canvas.height - 26, 40, 16, 0, 0, Math.PI * 2); ctx.fill();
+    const dir = 5 + Math.floor(t / 2.5) % 2; // faces SE, then S
+    return this.drawAvatarAt(ctx, e, dir === 6 ? 6 : 5, canvas.width / 2, canvas.height - 26, t, 2.2);
+  }
+  /** Head-and-shoulders portrait of a character as a 52x52 canvas, or null without sprite art. */
+  portrait(e) {
+    const tmp = this.scratch(260, 300); const tctx = tmp.getContext('2d', { willReadFrequently: true });
+    tctx.clearRect(0, 0, 260, 300);
+    const b = this.drawAvatarAt(tctx, e, 6, 130, 280, 0, 2.6);
+    if (!b) return null;
+    const c = document.createElement('canvas'); c.width = 52; c.height = 52;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = e.color || '#402020'; ctx.fillRect(0, 0, 52, 52);
+    ctx.drawImage(tmp, b.x + b.w / 2 - 26, b.y - 3, 52, 52, 0, 0, 52, 52);
+    return c;
   }
 
   currentAnim(e, sheetData, animDt) {
@@ -923,11 +1022,10 @@ export class Renderer {
     let top = cy - 50, drawn = false;
     if (desc) {
       const dir = e.dir === undefined ? (e.facing < 0 ? 7 : 5) : e.dir;
-      const sc = desc.scale;
-      const dim = 1;
+      const kx = desc.sx, ky = desc.sy;
       let bounds = null;
       const drawSheet = (sheetName, layerRefFrame) => {
-        const sd = this.assets.sprite(sheetName);
+        const sd = this.raceSheet(sheetName, desc);
         if (!sd) return;
         const cur = this.currentAnim(e, sd, layerRefFrame ? 0 : animDt);
         if (!cur) return;
@@ -935,9 +1033,9 @@ export class Renderer {
         const r = rects && rects[Math.min(cur.frame, rects.length - 1)];
         if (!r) return;
         const [sx, sy, sw, sh, rox, roy] = r;
-        const dx = cx - rox * sc, dy = cy - roy * sc;
-        ctx.drawImage(sd.img, sx, sy, sw, sh, dx, dy, sw * sc, sh * sc);
-        if (!bounds) bounds = { x: dx, y: dy, w: sw * sc, h: sh * sc }; else { const x0 = Math.min(bounds.x, dx), y0 = Math.min(bounds.y, dy); const x1 = Math.max(bounds.x + bounds.w, dx + sw * sc), y1 = Math.max(bounds.y + bounds.h, dy + sh * sc); bounds = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }; }
+        const dx = cx - rox * kx, dy = cy - roy * ky;
+        ctx.drawImage(sd.img, sx, sy, sw, sh, dx, dy, sw * kx, sh * ky);
+        bounds = bounds ? union(bounds, { x: dx, y: dy, w: sw * kx, h: sh * ky }) : { x: dx, y: dy, w: sw * kx, h: sh * ky };
       };
       if (desc.sheets) { for (const s of desc.sheets) drawSheet(s, false); }
       else {

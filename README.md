@@ -22,7 +22,7 @@ Five areas: Bramblewick, the Rusty Tankard tavern, its cellar, the Whispering Wo
 
 ### Character creation
 
-* Six races: Human, Elf, Dwarf, Halfling, Half-Orc, Gnome. Each has ability modifiers and traits.
+* Six races: Human, Elf, Dwarf, Halfling, Half-Orc, Gnome. Each has ability modifiers and traits, and its own look: body size, skin and hair (a live preview on the creation screen shows the character as it will appear in the game).
 * Six classes: Fighter, Barbarian, Rogue, Ranger, Cleric, Wizard. Each has a hit die, attack and save progression, proficiencies, class skills and features (Rage, Sneak Attack, Turn Undead, Favored Enemy, Weapon Specialization, spellcasting).
 * Point-buy abilities (30 points, NWN cost curve), skill ranks with class and cross-class costs, and a summary of the resulting stats.
 
@@ -53,7 +53,7 @@ Five areas: Bramblewick, the Rusty Tankard tavern, its cellar, the Whispering Wo
 
 ## Art
 
-Tiles, props and animated creature sprites are taken from Flare's fantasycore assets (CC-BY-SA 3.0, credits in `assets/CREDITS-flare.txt`, license in `assets/LICENSE-flare-art.txt`). They were rendered at half of Flare's 192x96 resolution, so the game grid is 96x48. Human characters, enemies and NPCs alike, are drawn from Flare's layered avatar sheets, so the hero's armor, weapon and shield show on the sprite. If the `assets/` folder is missing the game falls back to simple procedural graphics.
+Tiles, props and animated creature sprites are taken from Flare's fantasycore assets (CC-BY-SA 3.0, credits in `assets/CREDITS-flare.txt`, license in `assets/LICENSE-flare-art.txt`). They were rendered at half of Flare's 192x96 resolution, so the game grid is 96x48. Human characters, enemies and NPCs alike, are drawn from Flare's layered avatar sheets, so the hero's armor, weapon, shield and class headgear (coif, hood, helm) show on the sprite. Flare only has human bodies; the other races recolour the skin and hair of those sheets at load time and scale the body (`look` in `js/data/races.js`). If the `assets/` folder is missing the game falls back to simple procedural graphics.
 
 Spell, item, ability and class icons are from [game-icons.net](https://game-icons.net) (CC BY 3.0, attribution in `assets/CREDITS-game-icons.txt`). The assignments live in `js/data/icons.js`; `node tools/build-icons.mjs /path/to/game-icons` extracts the SVGs from a checkout of the game-icons/icons repository.
 

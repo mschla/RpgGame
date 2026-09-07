@@ -21,6 +21,8 @@ const WEAPON_LAYER = {
   longbow: 'longbow', longbow_1: 'longbow', light_crossbow: 'shortbow',
 };
 const SHIELD_LAYER = { small_shield: 'buckler', large_shield: 'kite_shield', large_shield_1: 'kite_shield', tower_shield: 'kite_shield' };
+// Head layer a class wears when it has no helmet of its own; heavy armour always comes with its helm
+const CLASS_HEAD = { fighter: 'chain_coif', rogue: 'leather_hood', wizard: 'mage_hood' };
 const ARMOR_LAYER = {
   none: ['default_chest', 'default_legs'], robe: ['mage_vest', 'mage_skirt'], light: ['leather_chest', 'leather_pants'],
   medium: ['chain_cuirass', 'chain_greaves'], heavy: ['plate_cuirass', 'plate_greaves'],
@@ -35,7 +37,11 @@ export function avatarFromEquipment(c) {
   const [chest, legs] = ARMOR_LAYER[set];
   const w = c.equipment.weapon ? WEAPON_LAYER[c.equipment.weapon] || 'longsword' : null;
   const s = c.equipment.shield ? SHIELD_LAYER[c.equipment.shield] || 'buckler' : null;
-  return { gender, layers: { chest, legs, feet: set === 'none' || set === 'robe' ? 'default_feet' : 'leather_boots', hands: 'default_hands', head: 'head', main: w, off: s } };
+  let head = 'head';
+  if (set === 'heavy') head = 'plate_helm';
+  else if (CLASS_HEAD[c.cls]) head = CLASS_HEAD[c.cls];
+  else if (c.cls === 'barbarian' && gender === 'male') head = 'head_bald';
+  return { gender, layers: { chest, legs, feet: set === 'none' || set === 'robe' ? 'default_feet' : 'leather_boots', hands: 'default_hands', head, main: w, off: s } };
 }
 
 /** Explicit avatar description used by monsters and NPCs: { gender, chest, legs, head, main, off, feet } */

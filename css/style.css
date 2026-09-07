@@ -65,6 +65,9 @@ canvas#game { position: fixed; inset: 0; display: block; cursor: crosshair; }
 .hud-card { display: flex; gap: 8px; background: var(--panel); border: 1px solid var(--panel-border); padding: 6px; border-radius: 4px; width: 260px; pointer-events: auto; }
 .portrait { width: 52px; height: 52px; border: 2px solid var(--gold-dim); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-family: Georgia, serif; font-size: 24px; color: #fff; text-shadow: 0 1px 2px #000; }
 .portrait.small { width: 36px; height: 36px; font-size: 16px; }
+.portrait { overflow: hidden; }
+.portrait .portrait-img { width: 100%; height: 100%; image-rendering: auto; }
+#cc-preview { display: block; margin: 8px 0 4px; background: radial-gradient(ellipse at 50% 80%, #24201a, #0d0b09 70%); border: 1px solid var(--panel-border); border-radius: 4px; }
 .hud-info { flex: 1; min-width: 0; }
 .hud-name { color: var(--gold); font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hud-sub { font-size: 11px; color: var(--muted); margin-bottom: 3px; }

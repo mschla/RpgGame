@@ -17,6 +17,7 @@ const creator = new CharacterCreator(
   (opts) => { showScreen('game'); game.newGame(opts); renderer.snapCamera(); },
   () => showScreen('menu'),
 );
+creator.renderer = renderer;
 
 function showScreen(name) {
   $('menu').classList.toggle('hidden', name !== 'menu');
@@ -32,7 +33,7 @@ function refreshSaveInfo() {
   $('save-info').textContent = info ? `Saved game: ${info.name}, level ${info.level} ${info.cls} (${new Date(info.savedAt).toLocaleString()})` : 'No saved game.';
 }
 
-$('btn-new').onclick = () => { creator.reset(); showScreen('create'); };
+$('btn-new').onclick = () => { showScreen('create'); creator.reset(); };
 $('btn-load').onclick = () => { if (game.load(1)) showScreen('game'); };
 $('btn-help-menu').onclick = () => { alert('Click to move and interact. Click enemies to attack, people to talk. Space pauses. C/I/B/J open character, inventory, spellbook and journal. R rests. F5 saves, F9 loads. Numbers 1-9 use the quickbar.'); };
 $('end-load').onclick = () => { if (game.load(1)) showScreen('game'); else showScreen('menu'); };

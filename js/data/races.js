@@ -1,6 +1,9 @@
+// `look` adapts Flare's human sheets to the race: body scale, and a recolouring of the skin (hue shift in degrees,
+// saturation and lightness factors) and of the hair (absolute hue and saturation, lightness of the mid tone).
 export const RACES = {
   human: {
     id: 'human', name: 'Human',
+    look: { sx: 1, sy: 1 },
     abilities: {},
     desc: 'Adaptable and ambitious. Humans gain an extra skill point every level and a bonus feat at first level.',
     traits: ['+1 skill point per level', 'Bonus feat: Toughness (+1 HP per level)'],
@@ -8,6 +11,7 @@ export const RACES = {
   },
   elf: {
     id: 'elf', name: 'Elf',
+    look: { sx: 0.96, sy: 1.04, skin: { h: 0, s: 0.75, l: 1.18 }, hair: { h: 44, s: 0.5, l: 0.4 } },
     abilities: { DEX: 2, CON: -2 },
     desc: 'Graceful and long-lived. Elves are keen-eyed, resist enchantments, and are natural archers.',
     traits: ['+2 DEX, -2 CON', '+2 Search, +2 Lore', '+2 Will save vs. mind spells', 'Keen senses'],
@@ -15,6 +19,7 @@ export const RACES = {
   },
   dwarf: {
     id: 'dwarf', name: 'Dwarf',
+    look: { sx: 1.1, sy: 0.86, skin: { h: -6, s: 1.3, l: 0.96 }, hair: { h: 14, s: 0.7, l: 0.24 } },
     abilities: { CON: 2, CHA: -2 },
     desc: 'Stout and steadfast. Dwarves are hardy, resist poison and magic, and know stonework.',
     traits: ['+2 CON, -2 CHA', '+2 Fortitude save', '+2 Search in dungeons', 'Darkvision'],
@@ -22,6 +27,7 @@ export const RACES = {
   },
   halfling: {
     id: 'halfling', name: 'Halfling',
+    look: { sx: 0.84, sy: 0.8, hair: { h: 28, s: 0.55, l: 0.3 } },
     abilities: { DEX: 2, STR: -2 },
     desc: 'Small and lucky. Halflings are nimble and quick-witted.',
     traits: ['+2 DEX, -2 STR', '+1 to all saves', '+2 Open Lock, +2 Persuade', 'Small: +1 AC, +1 attack'],
@@ -29,6 +35,7 @@ export const RACES = {
   },
   halforc: {
     id: 'halforc', name: 'Half-Orc',
+    look: { sx: 1.1, sy: 1.08, skin: { h: 52, s: 0.38, l: 0.8 }, hair: { h: 0, s: 0, l: 0.06 } },
     abilities: { STR: 2, INT: -2, CHA: -2 },
     desc: 'Strong and fierce. Half-orcs make fearsome warriors but rarely gifted diplomats.',
     traits: ['+2 STR, -2 INT, -2 CHA', 'Darkvision'],
@@ -36,6 +43,7 @@ export const RACES = {
   },
   gnome: {
     id: 'gnome', name: 'Gnome',
+    look: { sx: 0.82, sy: 0.78, skin: { h: 0, s: 1.1, l: 1.08 }, hair: { h: 40, s: 0.12, l: 0.52 } },
     abilities: { CON: 2, STR: -2 },
     desc: 'Clever and curious. Gnomes have a knack for lore and tinkering with traps.',
     traits: ['+2 CON, -2 STR', '+2 Lore, +2 Disable Trap', 'Small: +1 AC, +1 attack', 'Low-light vision'],
