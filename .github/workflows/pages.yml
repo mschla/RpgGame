@@ -3,6 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -15,7 +16,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Playwright
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Smoke test
+        run: npm test
   deploy:
+    needs: test
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -29,7 +45,7 @@ jobs:
       - name: Collect site files
         run: |
           mkdir _site
-          rsync -a --exclude .git --exclude .github --exclude _site --exclude tools ./ _site/
+          rsync -a --exclude .git --exclude .github --exclude _site --exclude tools --exclude node_modules --exclude package.json ./ _site/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

@@ -1,5 +1,6 @@
 import { Game } from './game/game.js';
 import { Renderer } from './game/renderer.js';
+import { Audio } from './game/audio.js';
 import { UI, CharacterCreator } from './game/ui.js';
 import { Assets } from './game/assets.js';
 
@@ -11,6 +12,12 @@ const renderer = new Renderer(canvas, $('minimap'), assets);
 const ui = new UI();
 const game = new Game(ui, renderer);
 ui.game = game; renderer.game = game;
+const audio = new Audio('assets/');
+game.audio = audio; ui.audio = audio;
+// browsers allow sound only after a gesture; the first click or key press also starts the title theme
+const unlock = () => { audio.unlock(); audio.preload(['swing', 'shoot', 'block', 'ui', 'coins', 'step_cloth', 'step_leather', 'step_metal', 'male_hit', 'female_hit', 'goblin_hit', 'goblin_die', 'goblin_phys', 'potion', 'door', 'wood_door', 'stairs']); };
+window.addEventListener('pointerdown', unlock, { capture: true }); window.addEventListener('keydown', unlock, { capture: true });
+document.addEventListener('click', (e) => { if (e.target.closest('button, .card, .quick-slot')) audio.sfx('ui', { volume: 0.5, vary: 0 }); }, true);
 window.game = game; // for debugging in the console
 
 const creator = new CharacterCreator(
@@ -20,6 +27,8 @@ const creator = new CharacterCreator(
 creator.renderer = renderer;
 
 function showScreen(name) {
+  if (name === 'menu' || name === 'create') audio.music('title_theme');
+  else if (name === 'endscreen') audio.music(null);
   $('menu').classList.toggle('hidden', name !== 'menu');
   $('create').classList.toggle('hidden', name !== 'create');
   $('game-ui').classList.toggle('hidden', name !== 'game');
@@ -95,6 +104,7 @@ window.addEventListener('keydown', (e) => {
   else if (/^[1-9]$/.test(k)) ui.useQuickSlot(parseInt(k, 10) - 1);
 });
 window.addEventListener('keyup', (e) => { game.keys[e.key.toLowerCase()] = false; });
+window.addEventListener('keydown', (e) => { const tag = document.activeElement && document.activeElement.tagName; if (e.key.toLowerCase() === 'm' && tag !== 'INPUT' && tag !== 'TEXTAREA') { const muted = audio.toggleMute(); if (game.running) game.log(muted ? 'Sound off.' : 'Sound on.', 'info'); } });
 window.addEventListener('blur', () => { game.keys = {}; });
 
 // ---------------------------------------------------------------- loop

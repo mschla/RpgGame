@@ -84,7 +84,7 @@ export function applyDamage(game, target, amount, type, source, opts = {}) {
   }
   target.hp -= dmg;
   game.fx.floatText(target, `-${dmg}`, type === 'fire' ? '#ff8040' : type === 'magic' ? '#a0c0ff' : '#ff4040');
-  if (target.hp > 0 && dmg > 0) game.fx.anim(target, 'hit');
+  if (target.hp > 0 && dmg > 0) { game.fx.anim(target, 'hit'); if (game.audio) game.audio.voice(target, 'hit'); }
   if (target.kind === 'monster') target.awake = true;
   if (target.hp <= 0) handleDeath(game, target, source);
   else if (source && hostileTo(source, target) && !target.target) {
@@ -106,6 +106,7 @@ export function heal(game, target, amount) {
 export function handleDeath(game, c, killer) {
   c.hp = 0;
   game.fx.anim(c, 'die'); c.moving = false;
+  if (game.audio) game.audio.voice(c, 'die');
   if (c.kind === 'henchman') {
     c.dead = true; c.unconscious = true; c.target = null; c.path = [];
     game.log(`${c.name} falls, badly wounded!`, 'death');
@@ -173,12 +174,14 @@ export function weaponAttack(game, attacker, defender, penalty = 0) {
   attacker.facing = defender.x >= attacker.x ? 1 : -1;
   attacker.dir = dirFromDelta(defender.x - attacker.x, defender.y - attacker.y);
   game.fx.anim(attacker, ast.ranged ? 'shoot' : 'swing');
+  if (game.audio) { game.audio.sfx(ast.ranged ? 'shoot' : 'swing', { at: attacker }); game.audio.voice(attacker, 'phys'); }
   if (!ast.ranged) game.fx.lunge(attacker, defender);
   if (ast.ranged) game.fx.projectile(attacker, defender, '#d0c0a0', 'arrow');
   const hit = r !== 1 && (r === 20 || held || total >= dst.ac);
   if (!hit) {
     game.log(`${attacker.name} attacks ${defender.name}: ${r}${fmt(atkBonus)}=${total} vs AC ${dst.ac}: miss.`, 'miss');
     game.fx.floatText(defender, 'miss', '#c0c0c0');
+    if (game.audio && !ast.ranged) game.audio.sfx('block', { at: defender, volume: 0.5 });
     if (hostileTo(attacker, defender) && !defender.target && !defender.dead) defender.target = attacker.uid;
     if (defender.kind === 'monster') defender.awake = true;
     return;
@@ -243,6 +246,7 @@ export function castSpell(game, caster, spell, target, entry = null) {
   if (tgt !== caster) caster.dir = dirFromDelta(tgt.x - caster.x, tgt.y - caster.y);
   game.fx.anim(caster, 'cast');
   game.fx.cast(caster, spell.color);
+  if (game.audio) game.audio.sfx(spell.damageType || (spell.kind === 'heal' ? 'heal' : spell.fx === 'heal' ? 'heal' : spell.kind === 'hold' ? 'hold' : 'buff'), { at: caster });
   game.log(`${caster.name} casts ${spell.name}.`, 'spell');
 
   if (spell.kind === 'heal') {
@@ -330,6 +334,7 @@ export function useRage(game, c) {
   c.hp += 2 * (2 + Math.floor(c.level / 4)); // CON bonus hp
   clampHp(c);
   game.fx.burst(c, '#ff4040', 0.8);
+  if (game.audio) game.audio.sfx('warcry', { at: c });
   game.log(`${c.name} flies into a rage!`, 'spell');
   return true;
 }
@@ -338,6 +343,7 @@ export function useTurnUndead(game, c) {
   if (c.turnUses <= 0) { game.log('No Turn Undead uses left today.', 'info'); return false; }
   c.turnUses--;
   game.fx.burst(c, '#fff0a0', 4);
+  if (game.audio) game.audio.sfx('turn', { at: c });
   game.log(`${c.name} presents the holy symbol and channels the light of dawn!`, 'spell');
   let hitAny = false;
   for (const e of [...game.area.entities]) {
@@ -366,5 +372,6 @@ export function usePotion(game, c, itemId) {
     game.log(`${c.name} drinks ${it.name}.`, 'spell');
   }
   game.fx.burst(c, '#80ff80', 0.6);
+  if (game.audio) game.audio.sfx('potion', { at: c });
   return true;
 }

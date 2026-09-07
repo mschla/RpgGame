@@ -2,7 +2,7 @@
 
 A browser-based role-playing game in the spirit of *Neverwinter Nights*: an isometric world, d20 combat rules, character creation with races and classes, real-time-with-pause fighting, spells, dialogue trees with skill checks, a quest journal, a henchman, loot, traps, locks, and save games.
 
-No build step and no runtime dependencies. It is plain HTML, CSS and ES modules drawn on a canvas. The art comes from the open-source game [Flare](https://github.com/flareteam/flare-game) (see *Art* below).
+No build step and no runtime dependencies (the only package is Playwright, for the smoke test: `npm install && npm test`). It is plain HTML, CSS and ES modules drawn on a canvas. The art comes from the open-source game [Flare](https://github.com/flareteam/flare-game) (see *Art* below).
 
 ## Running it
 
@@ -48,12 +48,15 @@ Five areas: Bramblewick, the Rusty Tankard tavern, its cellar, the Whispering Wo
 | 1–9 | Quickbar slots (abilities, spells, potions); pick dialogue replies |
 | C / I / B / J | Character sheet, inventory, spellbook, journal |
 | R | Rest (no enemies nearby) |
+| M | Mute / unmute sound |
 | F5 / F9 | Save / load (browser localStorage) |
 | Esc | Close panels, cancel targeting, pause |
 
 ## Art
 
 Tiles, props and animated creature sprites are taken from Flare's fantasycore assets (CC-BY-SA 3.0, credits in `assets/CREDITS-flare.txt`, license in `assets/LICENSE-flare-art.txt`). They were rendered at half of Flare's 192x96 resolution, so the game grid is 96x48. Human characters, enemies and NPCs alike, are drawn from Flare's layered avatar sheets, so the hero's armor, weapon, shield and class headgear (coif, hood, helm) show on the sprite. Flare only has human bodies; the other races recolour the skin and hair of those sheets at load time and scale the body (`look` in `js/data/races.js`). If the `assets/` folder is missing the game falls back to simple procedural graphics.
+
+Sound effects, music and ambient loops are Flare's as well (`assets/audio`; credits in `assets/CREDITS-flare.txt`): footsteps by armour, weapon and spell effects, creature voices, doors, coins and level-ups, a theme per area with a battle theme when enemies are near and a boss theme for the final fight. Volume sliders and a mute switch are in the help panel (`?` or <kbd>H</kbd>); <kbd>M</kbd> mutes.
 
 Spell, item, ability and class icons are from [game-icons.net](https://game-icons.net) (CC BY 3.0, attribution in `assets/CREDITS-game-icons.txt`). The assignments live in `js/data/icons.js`; `node tools/build-icons.mjs /path/to/game-icons` extracts the SVGs from a checkout of the game-icons/icons repository.
 
@@ -98,9 +101,11 @@ js/game/game.js       world state, AI, player actions, interactions, dialogue AP
 js/game/renderer.js   isometric canvas renderer, tile atlas, sprite animation, fog of war, effects, minimap
 js/game/assets.js     art loader, direction and animation helpers
 js/game/avatar.js     equipment to avatar sprite layer mapping
+js/game/audio.js      sound effects, music and ambience (Web Audio + streamed <audio>)
 tools/build-assets.mjs builds assets/ from a flare-game checkout
 tools/build-icons.mjs  extracts the game-icons.net SVGs listed in js/data/icons.js
 tools/blender/render_iso.py renders props and animated creatures with Blender into assets/extra/
+tools/smoke.mjs        Playwright smoke test (npm test); the Pages workflow runs it before deploying
 js/game/ui.js         HUD, quickbar, panels, dialogue, shop, loot, level-up, character creation
 ```
 

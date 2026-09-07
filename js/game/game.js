@@ -139,6 +139,7 @@ export class Game {
 
   // ------------------------------------------------------------ main loop
   update(dt) {
+    if (this.audio) this.audio.update(this, dt);
     if (!this.running || this.gameOver) return;
     this.fx.update(dt);
     if (this.paused || this.dialogue || this.ui.modalOpen()) return;
@@ -383,7 +384,7 @@ export class Game {
     const p = this.player;
     if (p.dead) return;
     const slot = p.spellSlots[spell.level];
-    if (!slot || slot.cur <= 0) { this.log('No spell slots remaining.', 'info'); return; }
+    if (!slot || slot.cur <= 0) { this.log('No spell slots remaining.', 'info'); if (this.audio) this.audio.sfx('no_mana'); return; }
     if (consume) slot.cur--;
     C.castSpell(this, p, spell, target);
     p.nextAttackAt = Math.max(p.nextAttackAt, this.time + C.ROUND * 0.6);
@@ -619,6 +620,7 @@ export class Game {
   }
   triggerTrap(trap, victim) {
     this.log(`${victim.name} triggers a ${trap.name.toLowerCase()}!`, 'fail');
+    if (this.audio) this.audio.sfx(trap.damageType === 'fire' ? 'fire' : 'trap', { at: trap });
     this.fx.explosion({ x: trap.x + 0.5, y: trap.y + 0.5 }, trap.damageType === 'fire' ? '#ff8020' : '#c0c0c0', 1);
     let dmg = rollDice(trap.damage);
     if (C.savingThrow(this, victim, 'ref', 15, trap.name)) dmg = victim.cls === 'rogue' && victim.level >= 2 ? 0 : Math.floor(dmg / 2);
@@ -628,7 +630,7 @@ export class Game {
     if (trap.disarmed) return;
     const p = this.player;
     const r = rollDie(20), sk = E.skillTotal(p, 'disabletrap');
-    if (r + sk >= trap.disarmDc) { trap.disarmed = true; this.log(`Disable Trap: ${r}+${sk}=${r + sk} vs DC ${trap.disarmDc}. You disarm the ${trap.name.toLowerCase()}.`, 'save'); this.awardXp(25 * Math.max(1, Math.floor(trap.disarmDc / 8))); }
+    if (r + sk >= trap.disarmDc) { trap.disarmed = true; this.log(`Disable Trap: ${r}+${sk}=${r + sk} vs DC ${trap.disarmDc}. You disarm the ${trap.name.toLowerCase()}.`, 'save'); this.awardXp(25 * Math.max(1, Math.floor(trap.disarmDc / 8))); if (this.audio) this.audio.sfx('ui'); }
     else if (r + sk < trap.disarmDc - 6) { this.log(`Disable Trap: ${r}+${sk}=${r + sk} vs DC ${trap.disarmDc}. You fumble and set it off!`, 'fail'); trap.triggered = true; this.triggerTrap(trap, p); }
     else this.log(`Disable Trap: ${r}+${sk}=${r + sk} vs DC ${trap.disarmDc}. You fail to disarm it.`, 'miss');
     p.nextAttackAt = this.time + C.ROUND;
@@ -636,8 +638,9 @@ export class Game {
   tryDoor(door) {
     if (door.open) return;
     const p = this.player;
-    if (!door.locked) { door.open = true; this.log(`You open the ${door.name.toLowerCase()}.`, 'info'); return; }
-    if (door.key && E.hasItem(p, door.key)) { door.open = true; door.locked = false; this.log(`You unlock the ${door.name.toLowerCase()} with the ${ITEMS[door.key].name}.`, 'quest'); this.fx.burst({ x: door.x + 0.5, y: door.y + 0.5 }, '#ffe080', 1); return; }
+    if (!door.locked) { door.open = true; this.log(`You open the ${door.name.toLowerCase()}.`, 'info'); if (this.audio) this.audio.sfx('door', { at: door }); return; }
+    if (door.key && E.hasItem(p, door.key)) { door.open = true; door.locked = false; this.log(`You unlock the ${door.name.toLowerCase()} with the ${ITEMS[door.key].name}.`, 'quest'); this.fx.burst({ x: door.x + 0.5, y: door.y + 0.5 }, '#ffe080', 1); if (this.audio) this.audio.sfx('door', { at: door }); return; }
+    if (this.audio) this.audio.sfx('pick_metal', { at: door, volume: 0.6 });
     this.ui.showChoice(`${door.name} (locked)`, `The door is locked and warded. ${door.key ? 'It needs a key.' : ''}`, [
       { text: `Pick the lock (Open Lock +${E.skillTotal(p, 'openlock')} vs DC ${door.dc})`, action: () => this.pickLock(door) },
       { text: `Bash it (STR check vs DC ${door.dc - 6})`, action: () => this.bash(door) },
@@ -652,8 +655,8 @@ export class Game {
     if (r + sk >= dc) {
       this.log(`Open Lock: ${r}+${sk}=${r + sk} vs DC ${dc}: success!`, 'save');
       this.awardXp(20 * Math.max(1, Math.floor(dc / 8)));
-      if (obj.type === 'door') { obj.open = true; obj.locked = false; } else { obj.locked = 0; obj.name = 'Chest'; this.openContainer(obj); }
-    } else this.log(`Open Lock: ${r}+${sk}=${r + sk} vs DC ${dc}: failure.`, 'miss');
+      if (obj.type === 'door') { obj.open = true; obj.locked = false; if (this.audio) this.audio.sfx('door', { at: obj }); } else { obj.locked = 0; obj.name = 'Chest'; this.openContainer(obj); }
+    } else { this.log(`Open Lock: ${r}+${sk}=${r + sk} vs DC ${dc}: failure.`, 'miss'); if (this.audio) this.audio.sfx('pick_metal', { at: obj, volume: 0.6 }); }
   }
   bash(obj) {
     const p = this.player;
@@ -699,17 +702,20 @@ export class Game {
       if (p.dead) return;
     }
     e.opened = true;
+    if (this.audio) this.audio.sfx(e.type === 'chest' ? 'chest' : 'loot', { at: e, volume: 0.7 });
     this.ui.showLoot(e);
   }
   takeLoot(e, index) {
     const p = this.player;
-    if (index === 'gold') { if (e.loot.gold > 0) { this.log(`You take ${e.loot.gold} gold.`, 'loot'); p.gold += e.loot.gold; e.loot.gold = 0; } }
+    if (index === 'gold') { if (e.loot.gold > 0) { this.log(`You take ${e.loot.gold} gold.`, 'loot'); p.gold += e.loot.gold; e.loot.gold = 0; if (this.audio) this.audio.sfx('coins'); } }
     else if (index === 'all') {
-      if (e.loot.gold > 0) { this.log(`You take ${e.loot.gold} gold.`, 'loot'); p.gold += e.loot.gold; e.loot.gold = 0; }
+      if (e.loot.gold > 0) { this.log(`You take ${e.loot.gold} gold.`, 'loot'); p.gold += e.loot.gold; e.loot.gold = 0; if (this.audio) this.audio.sfx('coins'); }
       for (const id of e.loot.items) { E.addItem(p, id, 1); this.log(`You take ${ITEMS[id].name}.`, 'loot'); this.onItemAcquired(id); }
+      if (e.loot.items.length && this.audio) this.audio.item(e.loot.items[0]);
       e.loot.items = [];
     } else {
       const id = e.loot.items[index];
+      if (this.audio) this.audio.item(id);
       if (id) { e.loot.items.splice(index, 1); E.addItem(p, id, 1); this.log(`You take ${ITEMS[id].name}.`, 'loot'); this.onItemAcquired(id); }
     }
     if (e.type === 'loot' && !e.loot.gold && !e.loot.items.length) this.area.entities = this.area.entities.filter(x => x !== e);
@@ -726,6 +732,7 @@ export class Game {
   // ------------------------------------------------------------ area transitions
   changeArea(toId, tx, ty) {
     const from = this.area;
+    if (this.audio && from && from.id !== toId) { const to = this.getArea(toId); this.audio.sfx(from.outdoor && to.outdoor ? 'wood_door' : from.id === 'tavern' || toId === 'tavern' ? 'wood_door' : 'stairs', { volume: 0.7 }); }
     const party = [this.player, this.henchman].filter(Boolean);
     from.entities = from.entities.filter(e => !party.includes(e));
     const area = this.getArea(toId);
@@ -752,6 +759,7 @@ export class Game {
     const p = this.player;
     if (p.dead || this.gameOver) return;
     if (this.hostilesAwake(12).length) { this.log('You cannot rest with enemies nearby.', 'info'); return; }
+    if (this.audio) this.audio.sfx('heal', { volume: 0.6 });
     this.ui.fade(() => {
       for (const c of [this.player, this.henchman]) {
         if (!c) continue;
@@ -787,6 +795,7 @@ export class Game {
   }
   onPlayerDeath() {
     this.gameOver = true;
+    if (this.audio) this.audio.sfx('heartbeat');
     this.ui.showDeath();
   }
   endGame() {
@@ -797,8 +806,8 @@ export class Game {
   questStage(id) { return this.quests[id] ? this.quests[id].stage : 0; }
   setQuest(id, stage) {
     const q = QUESTS[id];
-    if (!this.quests[id]) { this.quests[id] = { stage, done: false }; this.log(`Journal updated: ${q.name}`, 'quest'); }
-    else if (this.quests[id].stage !== stage) { this.quests[id].stage = stage; this.log(`Journal updated: ${q.name}`, 'quest'); }
+    if (!this.quests[id]) { this.quests[id] = { stage, done: false }; this.log(`Journal updated: ${q.name}`, 'quest'); if (this.audio) this.audio.sfx('page'); }
+    else if (this.quests[id].stage !== stage) { this.quests[id].stage = stage; this.log(`Journal updated: ${q.name}`, 'quest'); if (this.audio) this.audio.sfx('page'); }
     this.ui.refreshHud();
   }
   completeQuest(id) {
@@ -807,6 +816,7 @@ export class Game {
     if (this.quests[id].done) return;
     this.quests[id].stage = q.done; this.quests[id].done = true;
     this.log(`Quest completed: ${q.name}`, 'quest');
+    if (this.audio) this.audio.sfx('level_up', { volume: 0.6 });
     this.awardXp(q.xp);
   }
 
@@ -894,7 +904,7 @@ export class Game {
   equip(id) {
     const r = E.equipItem(this.player, id);
     if (!r.ok) this.log(r.why, 'info');
-    else { this.log(`You equip ${ITEMS[id].name}.`, 'info'); E.refreshSlots(this.player); C.clampHp(this.player); }
+    else { this.log(`You equip ${ITEMS[id].name}.`, 'info'); E.refreshSlots(this.player); C.clampHp(this.player); if (this.audio) this.audio.item(id); }
     this.ui.refreshAll();
   }
   unequip(slot) { E.unequipItem(this.player, slot); E.refreshSlots(this.player); C.clampHp(this.player); this.ui.refreshAll(); }
@@ -924,6 +934,7 @@ export class Game {
     if (p.gold < price) { this.log('You cannot afford that.', 'info'); return false; }
     p.gold -= price; E.addItem(p, id, 1);
     this.log(`Bought ${ITEMS[id].name} for ${price} gold.`, 'loot');
+    if (this.audio) this.audio.sfx('coins');
     return true;
   }
   sell(index, price) {
@@ -933,6 +944,7 @@ export class Game {
     if (it.qty > 1) it.qty--; else p.inventory.splice(index, 1);
     p.gold += price;
     this.log(`Sold ${ITEMS[it.id].name} for ${price} gold.`, 'loot');
+    if (this.audio) this.audio.sfx('coins');
     return true;
   }
   levelUp(alloc) {
@@ -941,6 +953,7 @@ export class Game {
     const hp = E.applyLevelUp(p, alloc);
     this.log(`${p.name} reaches level ${p.level}! (+${hp + E.abilityMod(p, 'CON')} hit points)`, 'xp');
     this.fx.burst(p, '#ffd040', 1.2);
+    if (this.audio) this.audio.sfx('level_up');
     this.ui.refreshAll();
   }
 

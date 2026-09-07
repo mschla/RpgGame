@@ -269,7 +269,14 @@ export class UI {
   }
 
   renderHelp(body) {
+    const au = this.audio;
     body.innerHTML = `<div class="help">
+      <h3>Sound</h3>
+      <div class="sound-settings">
+        <label>Music <input type="range" id="snd-music" min="0" max="100" value="${au ? Math.round(au.settings.music * 100) : 50}"></label>
+        <label>Effects <input type="range" id="snd-sfx" min="0" max="100" value="${au ? Math.round(au.settings.sfx * 100) : 80}"></label>
+        <label><input type="checkbox" id="snd-mute" ${au && au.settings.muted ? 'checked' : ''}> Mute (<kbd>M</kbd>)</label>
+      </div>
       <h3>Controls</h3>
       <p><b>Left click</b> ground to move. Click an enemy to attack it, a person to talk, a chest or corpse to loot, a glowing tile to travel.</p>
       <p><b>Right click</b> a creature or object to examine it (or cancel spell targeting).</p>
@@ -285,6 +292,11 @@ export class UI {
       <h3>Tips</h3>
       <p>Talk to everyone in Bramblewick before heading south. Buy healing potions. Wizards should stay behind the fighter and never wear armor. Return to town to rest and sell loot.</p>
     </div>`;
+    if (au) {
+      $('snd-music').oninput = (e) => au.set('music', e.target.value / 100);
+      $('snd-sfx').oninput = (e) => { au.set('sfx', e.target.value / 100); au.sfx('ui', { vary: 0 }); };
+      $('snd-mute').onchange = (e) => au.set('muted', e.target.checked);
+    }
   }
 
   // ---------------------------------------------------------------- modals

@@ -1,0 +1,12 @@
+{
+  "name": "shadows-of-bramblewick",
+  "private": true,
+  "description": "Browser RPG; the game itself has no dependencies, Playwright is only for the smoke test",
+  "type": "module",
+  "scripts": {
+    "test": "node tools/smoke.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1"
+  }
+}
