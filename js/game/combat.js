@@ -270,6 +270,22 @@ export function castSpell(game, caster, spell, target, entry = null) {
     for (const r of recipients) { addEffect(game, r, { ...eff }, dur, spell.name); game.fx.burst(r, spell.color, 0.7); }
     return true;
   }
+  if (spell.kind === 'debuff' && spell.area) {
+    // an area debuff (Sleep): every foe near the target saves, the weakest first while the hit-dice budget lasts
+    game.fx.burst(tgt, spell.color, spell.area);
+    const foes = area.entities.filter(e => e.hp !== undefined && !e.dead && hostileTo(caster, e) && distance(e, tgt) <= spell.area + 0.01).sort((a, b) => (a.level || 1) - (b.level || 1));
+    let budget = spell.maxHd ? spell.maxHd(lvl) : Infinity;
+    for (const e of foes) {
+      const hd = e.level || 1;
+      if (hd > budget) continue;
+      budget -= hd;
+      if (e.kind === 'monster') e.awake = true;
+      if (spell.save && savingThrow(game, e, spell.save, dc, spell.name)) { game.log(`${e.name} resists.`, 'save'); continue; }
+      addEffect(game, e, { ...spell.effect }, spell.duration(lvl), spell.name);
+      game.log(`${e.name} ${spell.effect.held ? 'falls asleep' : 'is affected'}!`, 'fail');
+    }
+    return true;
+  }
   if (spell.kind === 'debuff') {
     if (spell.humanoidOnly && !['humanoid', 'goblinoid'].includes(tgt.creatureType) && tgt.kind === 'monster') { game.log(`${spell.name} only affects humanoids.`, 'info'); }
     game.fx.projectile(caster, tgt, spell.color, 'bolt');

@@ -1,6 +1,6 @@
 export const QUESTS = {
   rats: {
-    name: 'Rats in the Cellar', xp: 150,
+    name: 'Rats in the Cellar', xp: 250,
     stages: {
       1: 'Bram, the innkeeper of the Rusty Tankard, is overrun with rats in his cellar. He will pay for five rat tails.',
       2: 'I have collected enough rat tails. I should return to Bram for my reward.',

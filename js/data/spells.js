@@ -6,8 +6,13 @@ export const SPELLS = {
   magic_missile: {
     name: 'Magic Missile', school: 'Evocation', level: 1, list: 'arcane', target: 'enemy', range: 10,
     kind: 'damage', damageType: 'magic', autoHit: true, fx: 'missile', color: '#9ad3ff',
-    damage: (lvl) => `${cap(1 + Math.floor((lvl - 1) / 2), 5)}d4+${cap(1 + Math.floor((lvl - 1) / 2), 5)}`,
-    desc: 'Darts of force that never miss. 1d4+1 damage per missile; one missile per two levels (max 5).',
+    damage: (lvl) => `${cap(1 + Math.floor((lvl + 1) / 2), 5)}d4+${cap(1 + Math.floor((lvl + 1) / 2), 5)}`,
+    desc: 'Darts of force that never miss. 1d4+1 damage per missile; two missiles at first level, one more every two levels (max 5).',
+  },
+  sleep: {
+    name: 'Sleep', school: 'Enchantment', level: 1, list: 'arcane', target: 'enemy', range: 8,
+    kind: 'debuff', save: 'will', area: 1.5, maxHd: (lvl) => 4 + Math.floor(lvl / 2), effect: { key: 'held', held: true }, duration: (lvl) => 3 + Math.floor(lvl / 2), fx: 'burst', color: '#b0a0ff',
+    desc: 'Foes near the target fall asleep for 3 rounds (+1 per two levels), weakest first, up to 4 hit dice (+1 per two levels). Will negates. Sleeping foes are hit automatically.',
   },
   burning_hands: {
     name: 'Burning Hands', school: 'Evocation', level: 1, list: 'arcane', target: 'enemy', range: 3,

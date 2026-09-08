@@ -1,6 +1,6 @@
 // Spell slots per class level (index = class level - 1), array index = spell level - 1
 const CASTER_SLOTS = [
-  [2], [3], [3, 1], [4, 2], [4, 2, 1], [4, 3, 2], [4, 3, 2, 1], [4, 4, 3, 2], [4, 4, 3, 2, 1], [4, 4, 3, 3, 2],
+  [3], [3], [3, 1], [4, 2], [4, 2, 1], [4, 3, 2], [4, 3, 2, 1], [4, 4, 3, 2], [4, 4, 3, 2, 1], [4, 4, 3, 3, 2],
 ];
 
 export const CLASSES = {
@@ -15,7 +15,7 @@ export const CLASSES = {
       { level: 6, name: 'Extra Attack', desc: 'Two attacks per round (from base attack bonus).' },
       { level: 8, name: 'Improved Critical', desc: 'Doubled critical threat range.' },
     ],
-    startingItems: ['longsword', 'chain_shirt', 'small_shield', 'potion_cure_light', 'potion_cure_light'], startingGold: 60,
+    startingItems: ['longsword', 'chain_shirt', 'small_shield', 'potion_cure_light', 'potion_cure_light', 'potion_cure_light'], startingGold: 60,
   },
   barbarian: {
     id: 'barbarian', name: 'Barbarian', hitDie: 12, bab: 'full', saves: { fort: 'good', ref: 'poor', will: 'poor' },
@@ -28,7 +28,7 @@ export const CLASSES = {
       { level: 3, name: 'Fast Movement', desc: '+10% movement speed.' },
       { level: 6, name: 'Extra Attack', desc: 'Two attacks per round (from base attack bonus).' },
     ],
-    startingItems: ['greataxe', 'studded_leather', 'potion_cure_light', 'potion_cure_light'], startingGold: 40,
+    startingItems: ['greataxe', 'studded_leather', 'potion_cure_light', 'potion_cure_light', 'potion_cure_light'], startingGold: 40,
   },
   rogue: {
     id: 'rogue', name: 'Rogue', hitDie: 6, bab: 'medium', saves: { fort: 'poor', ref: 'good', will: 'poor' },
@@ -40,7 +40,7 @@ export const CLASSES = {
       { level: 2, name: 'Evasion', desc: 'Take no damage on a successful Reflex save against area spells.' },
       { level: 3, name: 'Uncanny Dodge', desc: 'Keep DEX bonus to AC when surprised.' },
     ],
-    startingItems: ['short_sword', 'dagger', 'leather_armor', 'thieves_tools', 'potion_cure_light', 'potion_cure_light'], startingGold: 80,
+    startingItems: ['short_sword', 'dagger', 'studded_leather', 'thieves_tools', 'potion_cure_light', 'potion_cure_light', 'potion_cure_light'], startingGold: 80,
   },
   ranger: {
     id: 'ranger', name: 'Ranger', hitDie: 8, bab: 'full', saves: { fort: 'good', ref: 'good', will: 'poor' },
@@ -53,7 +53,7 @@ export const CLASSES = {
       { level: 5, name: 'Favored Enemy: Undead', desc: '+2 damage against undead.' },
       { level: 6, name: 'Extra Attack', desc: 'Two attacks per round (from base attack bonus).' },
     ],
-    startingItems: ['longbow', 'short_sword', 'studded_leather', 'potion_cure_light', 'potion_cure_light'], startingGold: 50,
+    startingItems: ['longbow', 'short_sword', 'studded_leather', 'potion_cure_light', 'potion_cure_light', 'potion_cure_light'], startingGold: 50,
   },
   cleric: {
     id: 'cleric', name: 'Cleric', hitDie: 8, bab: 'medium', saves: { fort: 'good', ref: 'poor', will: 'good' },
@@ -65,7 +65,7 @@ export const CLASSES = {
       { level: 1, name: 'Divine Spellcasting', desc: 'Cast divine spells. Bonus slots from Wisdom.' },
       { level: 1, name: 'Turn Undead', desc: 'Damage all nearby undead. Uses per day: 3 + CHA modifier.' },
     ],
-    startingItems: ['mace', 'chain_shirt', 'small_shield', 'holy_symbol', 'potion_cure_light'], startingGold: 50,
+    startingItems: ['mace', 'chain_shirt', 'small_shield', 'holy_symbol', 'potion_cure_light', 'potion_cure_light', 'potion_cure_light'], startingGold: 50,
   },
   wizard: {
     id: 'wizard', name: 'Wizard', hitDie: 4, bab: 'poor', saves: { fort: 'poor', ref: 'poor', will: 'good' },
@@ -94,7 +94,7 @@ export function saveForLevel(type, level) {
 
 // XP needed to reach a given level
 export function xpForLevel(level) {
-  return 1000 * (level * (level - 1)) / 2;
+  return 400 * (level * (level - 1)) / 2;   // the NWN curve at 40%: the campaign's XP takes a character to level 7
 }
 
 export const MAX_LEVEL = 10;

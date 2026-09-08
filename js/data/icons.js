@@ -3,7 +3,7 @@
 // tools/build-icons.mjs copies these into assets/icons/, the UI loads them as CSS masks.
 export const ICONS = {
   // ---- spells
-  magic_missile: 'lorc/missile-swarm', burning_hands: 'delapouite/fire-spell-cast', mage_armor: 'lorc/magic-shield', shield: 'lorc/energy-shield',
+  magic_missile: 'lorc/missile-swarm', sleep: 'delapouite/night-sleep', burning_hands: 'delapouite/fire-spell-cast', mage_armor: 'lorc/magic-shield', shield: 'lorc/energy-shield',
   ray_of_enfeeblement: 'lorc/marrow-drain', acid_arrow: 'lorc/chemical-bolt', bulls_strength: 'lorc/bull', cats_grace: 'lorc/cat',
   scorching_ray: 'lorc/fire-ray', fireball: 'lorc/fireball', lightning_bolt: 'lorc/focused-lightning', haste: 'lorc/sprint',
   vampiric_touch: 'lorc/evil-hand', stoneskin: 'lorc/stone-block', ice_storm: 'lorc/frozen-orb', cone_of_cold: 'lorc/icicles-aura',

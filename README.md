@@ -34,8 +34,8 @@ Five areas: Bramblewick, the Rusty Tankard tavern, its cellar, the Whispering Wo
 * Rounds last three seconds. A second attack at base attack +6. Haste grants an extra attack.
 * Armor limits the Dexterity bonus. Wizards cannot cast while wearing armor. Classes have weapon and armor proficiency lists.
 * Damage reduction (skeletons, Stoneskin), paralysis (ghouls, Hold Person), poison (spiders), damage over time (Acid Arrow), temporary hit points (Aid), party buffs (Bless, Prayer).
-* Experience thresholds follow the NWN table (level n needs 1000 × n(n−1)/2). Level cap 10. Level-up lets you spend skill points and, every fourth level, raise an ability.
-* Twenty-eight spells across five levels for Wizards (arcane) and Clerics (divine), with slots per level and bonus slots from the casting ability.
+* Experience thresholds follow the shape of the NWN table at 40% of its values (level n needs 400 × n(n−1)/2), so the campaign's experience carries a character to about level 7. Level cap 10. Level-up lets you spend skill points and, every fourth level, raise an ability.
+* Thirty-one spells across five levels for Wizards (arcane) and Clerics (divine), with slots per level and bonus slots from the casting ability.
 
 ### Controls
 
@@ -106,6 +106,8 @@ tools/build-assets.mjs builds assets/ from a flare-game checkout
 tools/build-icons.mjs  extracts the game-icons.net SVGs listed in js/data/icons.js
 tools/blender/render_iso.py renders props and animated creatures with Blender into assets/extra/
 tools/smoke.mjs        Playwright smoke test (npm test); the Pages workflow runs it before deploying
+tools/balance.mjs      headless fight simulator for tuning encounters (node tools/balance.mjs 1,2,3 [--tomas])
+tools/balance.mjs      fight simulator on the real rules (node tools/balance.mjs 1,3,6 --tomas)
 js/game/ui.js         HUD, quickbar, panels, dialogue, shop, loot, level-up, character creation
 ```
 

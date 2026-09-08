@@ -165,7 +165,6 @@ function buildCellar() {
       { type: 'transition', x: 1, y: 1, to: 'tavern', tx: 17, ty: 9, label: 'Up to the tavern' },
       { type: 'monster', tid: 'giant_rat', x: 6, y: 3 },
       { type: 'monster', tid: 'giant_rat', x: 14, y: 3 },
-      { type: 'monster', tid: 'giant_rat', x: 15, y: 5 },
       { type: 'monster', tid: 'giant_rat', x: 4, y: 10 },
       { type: 'monster', tid: 'giant_rat', x: 10, y: 11 },
       { type: 'monster', tid: 'dire_rat', x: 14, y: 10, name: 'Rat Matriarch' },
@@ -216,7 +215,6 @@ function buildForest() {
       { type: 'sign', x: 26, y: 3, label: 'Bramblewick north. Beware: goblins east, wolves west.' },
       // bandits on the road
       { type: 'monster', tid: 'bandit', x: 19, y: 15 },
-      { type: 'monster', tid: 'bandit', x: 22, y: 16 },
       { type: 'monster', tid: 'bandit', x: 21, y: 19, name: 'Bandit Leader' },
       // wolves
       { type: 'monster', tid: 'wolf', x: 8, y: 12 }, { type: 'monster', tid: 'wolf', x: 11, y: 15 }, { type: 'monster', tid: 'wolf', x: 6, y: 16 },
@@ -322,7 +320,7 @@ function buildCrypt() {
       { type: 'door', x: 20, y: 33, locked: true, dc: 28, key: 'crypt_key', name: 'Sanctum Door' },
       // sanctum
       { type: 'monster', tid: 'necromancer', x: 20, y: 36 },
-      { type: 'monster', tid: 'skeleton_warrior', x: 15, y: 37 }, { type: 'monster', tid: 'skeleton_warrior', x: 25, y: 37 },
+      { type: 'monster', tid: 'skeleton_warrior', x: 15, y: 37 }, { type: 'monster', tid: 'skeleton', x: 25, y: 37 },
       { type: 'monster', tid: 'wight', x: 22, y: 35 },
       { type: 'chest', x: 10, y: 36, loot: { gold: 200, items: ['potion_cure_serious', 'potion_speed', 'ring_protection_1', 'chainmail_1'] }, locked: 20 },
     ],
